@@ -201,7 +201,7 @@ def choose_clips(path, duration, requested_length, count, region="CL", allow_spe
     length=min(float(requested_length),duration-0.15)
     if length<=0:
         return [], fetch_trends(region)
-    target=max(1,min(int(count),12,max(1,int((duration-0.1)//length))))
+    target=max(1,min(int(count),12,max(1,int(duration//length))))
     trends=fetch_trends(region)
     long_source=duration>900
     max_start=max(0.,duration-length)
