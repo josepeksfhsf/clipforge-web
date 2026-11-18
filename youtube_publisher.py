@@ -296,7 +296,7 @@ def install_youtube_publisher(app, jobs, jobs_lock):
         privacy = str(data.get("privacy", "private"))
         for_kids = data.get("for_kids")
         altered_media = data.get("altered_media")
-        if not re.fullmatch(r"[a-f0-9]{32}", jid) or type(num) is not int or not 1 <= num <= 3:
+        if not re.fullmatch(r"[a-f0-9]{32}", jid) or type(num) is not int or not 1 <= num <= 12:
             raise HTTPException(400, "El identificador del clip no es válido.")
         if not 1 <= len(title) <= 100 or "<" in title or ">" in title:
             raise HTTPException(400, "El título debe tener entre 1 y 100 caracteres y no contener < ni >.")
@@ -391,7 +391,7 @@ def install_youtube_publisher(app, jobs, jobs_lock):
             source = Path(job["folder"])
             clip_data = [dict(c) for c in job.get("clips", [])]
             fallback_topic = str(job.get("topic_hint", ""))[:95]
-        if not clip_data or len(clip_data) > 3:
+        if not clip_data or len(clip_data) > 12:
             raise HTTPException(400, "No hay Shorts válidos para publicar.")
         paths = [source / f"short_{i + 1}.mp4" for i in range(len(clip_data))]
         if any(not path.is_file() for path in paths):
@@ -433,6 +433,11 @@ def install_youtube_publisher(app, jobs, jobs_lock):
                         title = str(editorial.get("title", "")).replace("<", "").replace(">", "").strip()[:100]
                         if not title:
                             title = f"ClipForge Short {i + 1}"
+                        # Avoid uploading near-identical titles for a longer batch.
+                        previous_titles = {v["title"].casefold() for v in record["videos"]}
+                        if title.casefold() in previous_titles:
+                            suffix = f" | Momento {i + 1}"
+                            title = title[:100 - len(suffix)].rstrip() + suffix
                         description = str(editorial.get("description", ""))[:5000]
                         part_progress = {"progress": 0}
                         link = _youtube_upload(valid_session["access_token"], source_path, title,
