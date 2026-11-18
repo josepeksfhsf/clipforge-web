@@ -93,7 +93,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
-<div class="layout"><main class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 60 minutos por video · 500 MB por archivo · 3 Shorts por trabajo · formato 9:16</p>
+<div class="layout"><main class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 60 minutos por video · 500 MB por archivo · hasta 12 Shorts distintos por trabajo · formato 9:16</p>
 <form id="form"><div class="tabs"><button type="button" class="tab on" id="tab-url">🔗 Pegar enlace</button><button type="button" class="tab" id="tab-file">⬆ Subir video</button></div>
 <div id="url-area"><label for="url">Pega el enlace de un video</label>
 <input type="text" inputmode="url" autocomplete="off" spellcheck="false" id="url" placeholder="Pega aquí el enlace (Shorts, Reels, TikTok...)">
@@ -103,7 +103,8 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <div class="yt-preview hidden" id="yt-preview"><img id="yt-thumb" alt="Vista previa del video" loading="lazy"><div><p class="yt-title">✓ Enlace de YouTube reconocido</p><p>El enlace es correcto. La descarga puede ser bloqueada por YouTube aunque sea público.</p></div></div></div>
 <div id="file-area" class="hidden"><label for="file">Selecciona un video</label><label for="file" class="file" id="filename">⬆ Haz clic para subir un MP4, MOV, WebM o MKV (máximo 500 MB)</label><input type="file" id="file" accept="video/*,.mkv,.mov" class="hidden"></div>
 <div class="two"><div><label for="length">Duración</label><select id="length"><option value="15">15 segundos</option><option value="30" selected>30 segundos</option><option value="45">45 segundos</option><option value="60">60 segundos</option></select></div>
-<div><label for="count">Cantidad</label><select id="count"><option value="1">1 clip</option><option value="2" selected>2 clips</option><option value="3">3 clips</option></select></div></div>
+<div><label for="count">Cantidad de clips diferentes</label><select id="count"><option value="1">1 clip</option><option value="2">2 clips</option><option value="3" selected>3 clips</option><option value="4">4 clips</option><option value="5">5 clips</option><option value="6">6 clips</option><option value="7">7 clips</option><option value="8">8 clips</option><option value="9">9 clips</option><option value="10">10 clips</option><option value="11">11 clips</option><option value="12">12 clips</option></select></div></div>
+<p class="note" id="clip-quantity-hint">La IA prioriza momentos distintos, evita solapamientos y los reparte por el video. Si el original es corto, puede generar menos clips. Generar muchos con subtítulos tarda más.</p>
 <div class="manual-panel"><label class="check" style="margin:0 0 10px"><input type="checkbox" id="manual-mode"><span><strong>Elegir el segundo exacto de inicio</strong><br><span style="font-weight:400">Desactívalo para seguir usando cortes automáticos.</span></span></label>
 <div id="manual-controls" class="hidden"><div class="inline"><label for="manual-start" style="margin:0">Comenzar en</label><input id="manual-start" type="number" min="0" max="3599" step="0.1" value="0"><span>segundos</span><button id="use-playhead" type="button" class="hidden">Usar segundo del video</button></div>
 <small>Si pides varios clips, empezarán uno detrás de otro desde ese segundo. La duración se ajusta automáticamente al final del video.</small></div>
@@ -172,7 +173,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <div class="feature"><div class="icon">🎬</div><div><strong>1. Elige tu video</strong><p>Sube tu archivo o pega un enlace público de las plataformas indicadas.</p></div></div>
 <div class="feature"><div class="icon">📱</div><div><strong>2. Generamos Shorts</strong><p>ClipForge analiza señales de interés y genera fragmentos verticales 540 × 960.</p></div></div>
 <div class="feature"><div class="icon">🚀</div><div><strong>3. Publica en YouTube</strong><p>Con Google conectado, publica los clips individualmente o configura la subida automática de todos al terminar.</p></div></div>
-<div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales; las subidas y exportaciones grandes pueden agotarse en el plan gratuito. Los fragmentos se eligen por intervalos, con análisis experimental (sin garantía de viralidad), y ahora permiten añadir subtítulos y narración robótica opcionales. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
+<div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales; generar 8-12 clips con subtítulos puede agotar CPU y memoria en el plan gratuito. Los fragmentos se seleccionan en momentos distintos sin solapamientos, con análisis experimental (sin garantía de viralidad ni de que escenas idénticas se distingan siempre), y ahora permiten añadir subtítulos y narración robótica opcionales. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
 
 <section class="panel social-section" id="social-hub">
  <div class="social-top"><div><h2>📣 Redes sociales y títulos con IA</h2>
@@ -609,7 +610,7 @@ function updateAutoYoutubeSettings(){
   $("publish-no").setAttribute("aria-pressed",String(!enabled));
   $("yt-auto-login").classList.toggle("hidden",!ytAuth.configured||ytAuth.connected);
   $("yt-auto-connect").textContent=ytAuth.connected?
-    "✓ YouTube conectado. Puedes autorizar la subida automática de hasta tres Shorts.":
+    "✓ YouTube conectado. Puedes autorizar la subida de hasta doce Shorts distintos. Cada subida usa cuota de YouTube.":
     ytAuth.configured?"Antes de publicar, conecta YouTube con Google usando el botón de abajo.":
     "El administrador todavía debe configurar las credenciales de Google.";
   $("yt-batch-start-existing").classList.toggle("hidden",!enabled||!readyClips.length);
