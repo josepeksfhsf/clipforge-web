@@ -352,6 +352,110 @@ def install_youtube_publisher(app, jobs, jobs_lock):
             _session_cookie(response, valid_session)
         return response
 
+
+    @app.post("/api/publish/youtube/batch")
+    async def youtube_publish_batch(request: Request):
+        """Explicitly authorized one-click upload of every clip from a completed job.
+
+        Copy is generated per clip server-side, then uploads run sequentially.
+        The accepted batch survives closing the browser while the Render worker stays alive.
+        """
+        if not is_configured():
+            raise HTTPException(503, "Configura primero YouTube OAuth en Render.")
+        session = _session(request)
+        _check_action(request, session)
+        try:
+            data = await request.json()
+        except Exception:
+            raise HTTPException(400, "Configuración de publicación inválida.")
+        jid = str(data.get("job_id", ""))
+        privacy = str(data.get("privacy", "private"))
+        for_kids = data.get("for_kids")
+        altered_media = data.get("altered_media")
+        style = str(data.get("style", "intriga"))
+        topic = str(data.get("topic", "")).strip()[:95]
+        if not re.fullmatch(r"[a-f0-9]{32}", jid):
+            raise HTTPException(400, "El identificador del trabajo no es válido.")
+        if privacy not in ("private", "unlisted", "public"):
+            raise HTTPException(400, "Selecciona la privacidad de YouTube.")
+        if type(for_kids) is not bool or type(altered_media) is not bool:
+            raise HTTPException(400, "Indica los valores para menores y contenido sintético.")
+        if style not in ("intriga", "emocion", "humor", "informativo"):
+            raise HTTPException(400, "Estilo inválido.")
+        if data.get("confirmed") is not True:
+            raise HTTPException(400, "Confirma expresamente que autorizas publicar todos los Shorts.")
+        with jobs_lock:
+            job = jobs.get(jid)
+            if not job or job.get("status") != "done":
+                raise HTTPException(404, "Genera los Shorts antes de publicar.")
+            source = Path(job["folder"])
+            clip_data = [dict(c) for c in job.get("clips", [])]
+            fallback_topic = str(job.get("topic_hint", ""))[:95]
+        if not clip_data or len(clip_data) > 3:
+            raise HTTPException(400, "No hay Shorts válidos para publicar.")
+        paths = [source / f"short_{i + 1}.mp4" for i in range(len(clip_data))]
+        if any(not path.is_file() for path in paths):
+            raise HTTPException(404, "Un Short ha expirado: genera otra vez los clips.")
+        try:
+            valid_session, renewed = _authorize_session(session)
+        except Exception:
+            raise HTTPException(401, "Vuelve a conectar tu cuenta de Google.")
+        owner = hashlib.sha256(session["csrf"].encode("ascii")).hexdigest()
+        with UPLOAD_LOCK:
+            # Deliberately reject duplicate batches; never post twice by double-click.
+            for old in UPLOADS.values():
+                if (old.get("kind") == "batch" and old.get("owner") == owner
+                        and old.get("job_id") == jid
+                        and (old.get("status") != "error" or old.get("completed", 0) > 0)):
+                    raise HTTPException(409, "Los Shorts de este trabajo ya se enviaron o están en proceso.")
+            if sum(x["status"] in ("queued", "working") for x in UPLOADS.values()) >= 2:
+                raise HTTPException(429, "Ya hay dos publicaciones pendientes.")
+            for k, v in list(UPLOADS.items()):
+                if time.time() - v["created"] > 7200 and v["status"] in ("done", "error"):
+                    del UPLOADS[k]
+            upload_id = secrets.token_hex(16)
+            record = {
+                "kind": "batch", "owner": owner, "job_id": jid, "created": time.time(),
+                "status": "queued", "progress": 0, "message": "Clips preparados para publicar.",
+                "url": None, "videos": [], "completed": 0, "total": len(paths)
+            }
+            UPLOADS[upload_id] = record
+
+        def worker():
+            from social_studio import create_social_copy
+            with UPLOAD_SLOT:
+                try:
+                    for i, source_path in enumerate(paths):
+                        with UPLOAD_LOCK:
+                            record.update(status="working", message=f"Publicando Short {i + 1} de {len(paths)}...",
+                                          progress=int(i * 100 / len(paths)))
+                        editorial = create_social_copy(clip_data[i], "youtube", style, topic or fallback_topic)
+                        title = str(editorial.get("title", "")).replace("<", "").replace(">", "").strip()[:100]
+                        if not title:
+                            title = f"ClipForge Short {i + 1}"
+                        description = str(editorial.get("description", ""))[:5000]
+                        part_progress = {"progress": 0}
+                        link = _youtube_upload(valid_session["access_token"], source_path, title,
+                                               description, privacy, for_kids, altered_media,
+                                               part_progress, upload_id)
+                        with UPLOAD_LOCK:
+                            record["videos"].append({"number": i + 1, "title": title, "url": link})
+                            record["completed"] = i + 1
+                            record["progress"] = int((i + 1) * 100 / len(paths))
+                    with UPLOAD_LOCK:
+                        record.update(status="done", progress=100,
+                                      message="YouTube confirmó todos los videos. Revisa su procesamiento.")
+                except Exception as exc:
+                    with UPLOAD_LOCK:
+                        record.update(status="error", message=("Publicación incompleta: " + str(exc))[:240])
+
+        threading.Thread(target=worker, daemon=True).start()
+        response = JSONResponse({"upload_id": upload_id, "status": "queued", "total": len(paths)},
+                                status_code=202)
+        if renewed:
+            _session_cookie(response, valid_session)
+        return response
+
     @app.get("/api/publish/youtube/uploads/{upload_id}")
     def youtube_upload_status(request: Request, upload_id: str):
         session = _session(request)
@@ -363,4 +467,4 @@ def install_youtube_publisher(app, jobs, jobs_lock):
             record = UPLOADS.get(upload_id)
             if not record:
                 raise HTTPException(404, "Publicación no encontrada o servidor reiniciado.")
-            return {k: record.get(k) for k in ("status", "progress", "message", "url")}
+            return {k: record.get(k) for k in ("status", "progress", "message", "url", "videos", "completed", "total")}
