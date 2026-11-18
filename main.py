@@ -14,7 +14,8 @@ app=FastAPI(title="ClipForge")
 jobs={}
 mutex=threading.RLock()
 slot=threading.BoundedSemaphore(1)
-MAX_BYTES=140*1024*1024
+MAX_DURATION_SECONDS=60*60
+MAX_BYTES=500*1024*1024
 
 def command(args,timeout=240):
     p=subprocess.run(args,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,timeout=timeout)
@@ -95,13 +96,13 @@ def download_video(url,folder):
           "js_runtimes":{"node":{"path":"/usr/local/bin/node"}}}
     with yt_dlp.YoutubeDL(opts) as ydl:
         meta=ydl.extract_info(url,download=False)
-        if meta.get("is_live") or float(meta.get("duration") or 0)>900:
-            raise ValueError("El video debe estar grabado y durar hasta 15 minutos.")
+        if meta.get("is_live") or float(meta.get("duration") or 0)>MAX_DURATION_SECONDS:
+            raise ValueError("El video debe estar grabado y durar como máximo 60 minutos.")
         ydl.download([url])
     found=[p for p in folder.glob("source.*") if p.is_file() and not p.name.endswith(".part")]
     if not found:raise ValueError("No se pudo descargar ese video autorizado.")
     result=max(found,key=lambda p:p.stat().st_size)
-    if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera 140 MB.")
+    if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera el límite de 500 MB.")
     return result
 
 def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
@@ -115,8 +116,8 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
             if not any(x.get("codec_type")=="video" for x in data.get("streams",[])):
                 raise ValueError("El archivo no contiene video.")
             duration=float(data.get("format",{}).get("duration",0))
-            if not math.isfinite(duration) or duration<2 or duration>900:
-                raise ValueError("El video debe durar entre 2 segundos y 15 minutos.")
+            if not math.isfinite(duration) or duration<2 or duration>MAX_DURATION_SECONDS:
+                raise ValueError("El video debe durar entre 2 segundos y 60 minutos.")
             smart_data=None
             if smart_mode and manual_start < 0:
                 set_status(j,progress=26,message="Analizando audio, escenas, voz y tendencias actuales...")
@@ -189,7 +190,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500}
 
 @app.get("/api/trends")
 def trends(region:str="CL"):
@@ -204,7 +205,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                  rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or count not in (1,2,3):raise HTTPException(400,"Parámetros incorrectos.")
-    if not math.isfinite(start) or start < -1 or start > 900:
+    if not math.isfinite(start) or start < -1 or start > MAX_DURATION_SECONDS:
         raise HTTPException(400,"El segundo de inicio no es válido.")
     if region not in REGIONS: raise HTTPException(400,"Región no válida.")
     if bool(url.strip())==bool(file and file.filename):raise HTTPException(400,"Elige un enlace o un archivo.")
@@ -230,7 +231,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
             with uploaded.open("wb") as f:
                 while chunk:=await file.read(1024*1024):
                     size+=len(chunk)
-                    if size>MAX_BYTES:raise HTTPException(413,"Máximo 140 MB.")
+                    if size>MAX_BYTES:raise HTTPException(413,"El archivo supera los 500 MB. Usa un archivo más comprimido.")
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
         with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],"copy_cache":{}}
