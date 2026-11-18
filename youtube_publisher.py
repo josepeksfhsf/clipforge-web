@@ -202,6 +202,11 @@ def install_youtube_publisher(app, jobs, jobs_lock):
         data = _session(request)
         return {
             "configured": is_configured(),
+            "checks": {
+                "google_client_id_present": bool(CLIENT_ID),
+                "google_client_secret_present": bool(CLIENT_SECRET),
+                "session_encryption_key_valid": bool(_cipher())
+            },
             "connected": bool(data),
             "csrf": data["csrf"] if data else None,
             "setup_required": not is_configured(),
