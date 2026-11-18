@@ -81,6 +81,15 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 .batch-box button:disabled{opacity:.55;cursor:wait}
 .batch-box p{font-size:12px;color:#b8d6cc;line-height:1.5}
 .batch-box a{color:#9cead1}
+
+.publish-decision{display:flex;gap:9px;margin:12px 0}
+.publish-decision button{flex:1;min-width:0;border:1px solid #465977;border-radius:11px;background:#1e2b44;color:#c5d5e4;padding:13px 9px;font-weight:800;cursor:pointer}
+.publish-decision button.active{border-color:#3ed2aa;background:#165948;color:white;box-shadow:0 0 0 1px #3ed2aa55 inset}
+.editing-options{padding:16px;border-radius:14px;border:1px solid #49587c;margin:17px 0;background:#0d1c32}
+.editing-options h3{font-size:15px;margin:0 0 8px;color:#e9ddff}
+.editing-options input[type=text]{font-size:13px}
+.editing-options .check{margin:11px 0}
+.metadata-preview{color:#b1dfce;font-size:12px;line-height:1.5;margin-top:11px;overflow-wrap:anywhere;white-space:pre-line}
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
@@ -111,11 +120,31 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 </section>
 <p class="note">Para videos largos, la IA toma muestras de distintas partes del contenido. No necesita analizar todos los fotogramas.</p>
 <label for="title">Texto en pantalla (opcional)</label><input id="title" maxlength="80" placeholder="¡No te esperabas este final!">
+<section class="editing-options" id="editing-options">
+<h3>🎙️ Edición con IA: subtítulos y narración</h3>
+<label class="check"><input id="enable-subtitles" type="checkbox" checked><span><strong>📝 Añadir subtítulos automáticos</strong><span style="display:block;font-weight:400">Se generan desde el audio con Whisper y quedan incrustados en el MP4. Si no hay voz reconocible, no aparecerán.</span></span></label>
+<label class="check"><input id="enable-robot-voice" type="checkbox"><span><strong>🔊 Añadir voz robótica en español (estilo clásico)</strong><span style="display:block;font-weight:400">Narrador sintético parecido al estilo Loquendo, creado con eSpeak NG. No utiliza la voz comercial de Loquendo.</span></span></label>
+<div id="robot-text-fields" class="hidden">
+<label for="robot-text">¿Qué debe decir el narrador?</label>
+<input id="robot-text" type="text" maxlength="180" placeholder="Ej.: No vas a creer lo que pasa en esta partida">
+<p class="note">Si lo dejas vacío, leerá el texto en pantalla o una frase introductoria genérica.</p>
+</div>
+</section>
 <section class="auto-yt" id="auto-youtube">
-<label class="check"><input type="checkbox" id="yt-auto-upload"><span><strong>🚀 Subir automáticamente mis Shorts a YouTube</strong>
-<span style="display:block;font-weight:400">Después de generarlos, ClipForge los enviará a YouTube con títulos y descripciones sugeridos. Debes conectar Google y autorizar la publicación antes de crear los clips.</span></span></label>
+<strong>📣 ¿Quieres subir automáticamente los clips a YouTube?</strong>
+<p class="muted">ClipForge prepara títulos, descripciones y hashtags relacionados con el video, incluso si eliges no publicar. Puedes revisarlos y editarlos.</p>
+<input type="checkbox" id="yt-auto-upload" class="hidden" tabindex="-1">
+<div class="publish-decision">
+<button type="button" id="publish-no" class="active" aria-pressed="true">✋ NO, solo generar</button>
+<button type="button" id="publish-yes" aria-pressed="false">🚀 SÍ, publicar</button>
+</div>
 <div class="config hidden" id="yt-auto-settings">
   <p class="muted" id="yt-auto-connect">Verificando cuenta de YouTube...</p>
+  <label for="yt-auto-style">Estilo de título y descripción</label>
+  <select id="yt-auto-style"><option value="intriga" selected>👀 Intriga y curiosidad</option><option value="emocion">🔥 Emoción</option><option value="humor">😂 Humor</option><option value="informativo">🎬 Informativo</option></select>
+  <label for="yt-auto-topic">Tema o personaje para hashtags más precisos (opcional)</label>
+  <input type="text" id="yt-auto-topic" maxlength="95" placeholder="Ej.: GTA 6, Fortnite, Frutinovelas">
+  <p class="muted">Los hashtags se adaptan al tema y al audio. No existe un hashtag que garantice viralidad.</p>
   <a href="/api/publish/youtube/connect" id="yt-auto-login" class="conn-link hidden">Conectar mi YouTube</a>
   <label for="yt-auto-privacy">Visibilidad en YouTube</label>
   <select id="yt-auto-privacy"><option value="private" selected>Privado (recomendado para probar)</option><option value="unlisted">No listado</option><option value="public">Público</option></select>
@@ -143,7 +172,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <div class="feature"><div class="icon">🎬</div><div><strong>1. Elige tu video</strong><p>Sube tu archivo o pega un enlace público de las plataformas indicadas.</p></div></div>
 <div class="feature"><div class="icon">📱</div><div><strong>2. Generamos Shorts</strong><p>ClipForge analiza señales de interés y genera fragmentos verticales 540 × 960.</p></div></div>
 <div class="feature"><div class="icon">🚀</div><div><strong>3. Publica en YouTube</strong><p>Con Google conectado, publica los clips individualmente o configura la subida automática de todos al terminar.</p></div></div>
-<div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales; las subidas y exportaciones grandes pueden agotarse en el plan gratuito. Los fragmentos se eligen por intervalos, con análisis experimental (sin garantía de viralidad), y no incluyen subtítulos automáticos. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
+<div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales; las subidas y exportaciones grandes pueden agotarse en el plan gratuito. Los fragmentos se eligen por intervalos, con análisis experimental (sin garantía de viralidad), y ahora permiten añadir subtítulos y narración robótica opcionales. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
 
 <section class="panel social-section" id="social-hub">
  <div class="social-top"><div><h2>📣 Redes sociales y títulos con IA</h2>
@@ -351,7 +380,11 @@ publish.addEventListener("click",()=>{
  $("make-social-copy").click();
  $("social-hub").scrollIntoView({behavior:"smooth",block:"start"});
 });
-info.append(publish);e.append(v,info);$("cards").append(e)}
+info.append(publish);
+const preview=document.createElement("div");preview.className="metadata-preview";preview.textContent="✨ Creando título, descripción y hashtags...";
+info.append(preview);
+generateClipMetadata(id,currentNumber,preview);
+e.append(v,info);$("cards").append(e)}
 $("yt-batch-box").classList.remove("hidden");
 if(ytAutoRequested)publishYoutubeBatch(id,true);
 }if(data.status==="error"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
@@ -372,6 +405,9 @@ if($("manual-mode").checked){
  if(!Number.isFinite(start)||start<0||start>3600){setStatus("Elige un segundo válido.",0);$("submit").disabled=false;return}
  body.append("start",String(start));
 }else body.append("start","-1");
+body.append("subtitles",String($("enable-subtitles").checked));
+body.append("robot_voice",String($("enable-robot-voice").checked));
+body.append("voice_text",$("robot-text").value.trim());
 body.append("rights","true");body.append("smart",String($("smart-mode").checked&&!$("manual-mode").checked));body.append("region",$("trend-region").value);try{
 const data=await new Promise((resolve,reject)=>{
   const xhr=new XMLHttpRequest();
