@@ -46,7 +46,7 @@ def make_subtitles(source: Path, start: float, length: float, target: Path):
             if smart._MODEL is None:
                 from faster_whisper import WhisperModel
                 smart._MODEL=WhisperModel("tiny",device="cpu",compute_type="int8",
-                                         cpu_threads=1,num_workers=1,download_root="/app/models")
+                                         cpu_threads=1,num_workers=1,download_root="/app/models",local_files_only=True)
             segments,_=smart._MODEL.transcribe(str(wav),beam_size=1,best_of=1,
                          condition_on_previous_text=False,vad_filter=True,language="es")
             captions=[]
