@@ -343,11 +343,29 @@ info.append(a);
 const edit=document.createElement("button");edit.type="button";edit.className="social-action";edit.style.width="100%";edit.style.marginTop="8px";edit.textContent="✨ Crear texto para publicar";
 const currentNumber=data.clips.indexOf(c)+1;
 edit.addEventListener("click",()=>{socialJobSelectClip(currentNumber);$("social-hub").scrollIntoView({behavior:"smooth",block:"start"});});
-info.append(edit);e.append(v,info);$("cards").append(e)}}if(data.status==="error"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
+info.append(edit);
+const publish=document.createElement("button");publish.type="button";publish.className="clip-publish";publish.textContent="▶ Publicar en YouTube";
+publish.addEventListener("click",()=>{
+ socialJobSelectClip(currentNumber);
+ $("social-platform").value="youtube";
+ $("make-social-copy").click();
+ $("social-hub").scrollIntoView({behavior:"smooth",block:"start"});
+});
+info.append(publish);e.append(v,info);$("cards").append(e)}
+$("yt-batch-box").classList.remove("hidden");
+if(ytAutoRequested)publishYoutubeBatch(id,true);
+}if(data.status==="error"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
 const msg=(data.message||"").toLowerCase();
 if(msg.includes("bloque")||msg.includes("youtube")||msg.includes("plataforma")||msg.includes("iniciar sesión")||msg.includes("privado")){
 $("backup").classList.remove("hidden");}}}catch(e){clearInterval(interval);setStatus(e.message,0);$("submit").disabled=false}}
 $("form").onsubmit=async e=>{e.preventDefault();clearInterval(interval);if(mode==="url"&&!$("url").value.trim()){setStatus("Pega un enlace a un video público.",0);return}if(mode==="file"&&!$("file").files.length){setStatus("Selecciona un video.",0);return}if(mode==="file"&&$("file").files[0].size>500*1024*1024){setStatus("El archivo supera 500 MB.",0);return}if(!$("rights").checked){setStatus("Confirma los derechos del video.",0);return}
+if($("yt-auto-upload").checked){
+  const options=getYoutubeBatchOptions();
+  if(!ytAuth.connected){setStatus("Conecta primero tu canal de YouTube con Google.",0);$("auto-youtube").scrollIntoView({behavior:"smooth"});return}
+  if(!options){setStatus("Responde a las preguntas sobre contenido infantil y sintético para activar la publicación.",0);$("auto-youtube").scrollIntoView({behavior:"smooth"});return}
+  if(!confirm("¿Autorizas publicar automáticamente hasta "+$("count").value+" Shorts en YouTube como «"+$("yt-auto-privacy").selectedOptions[0].text+"», con títulos y descripciones sugeridos por ClipForge, una vez generados?"))return;
+  ytAutoRequested=true;
+}else ytAutoRequested=false;
 $("submit").disabled=true;$("submit").textContent="Procesando...";$("cards").replaceChildren();$("backup").classList.add("hidden");setStatus("Comprobando el enlace y enviando al servidor...",5);const body=new FormData();body.append("url",mode==="url"?cleanPastedLink($("url").value):"");if(mode==="file")body.append("file",$("file").files[0]);body.append("length",$("length").value);body.append("count",$("count").value);body.append("title",$("title").value);
 if($("manual-mode").checked){
  const start=Number($("manual-start").value);
@@ -378,6 +396,7 @@ activeJobId=data.id;socialJobReset();await poll(data.id);if($("submit").disabled
 let readyClips=[], socialJob="", latestSocial=null;
 function socialJobReset(){
   readyClips=[];socialJob="";latestSocial=null;
+  $("yt-batch-box").classList.add("hidden");$("yt-batch-status").replaceChildren();
   $("social-clip").replaceChildren();
   const option=document.createElement("option");option.textContent="Genera un video primero";option.value="";
   $("social-clip").append(option);
