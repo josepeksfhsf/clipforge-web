@@ -53,6 +53,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 @media(max-width:820px){.social-grid{grid-template-columns:1fr}.social-fields{grid-template-columns:1fr}}
 
 /* YouTube uploader: official OAuth connection and explicit upload consent. */
+.yt-connectbox .hidden{display:none!important}
 .yt-connectbox{margin:14px 0;padding:15px;border:1px solid #40687c;border-radius:14px;background:#102337}
 .yt-connectbox strong{font-size:14px}
 .yt-connectbox p{font-size:12px;color:#a7c0d6;line-height:1.55}
@@ -123,7 +124,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
     <a id="yt-connect-link" href="/api/publish/youtube/connect" class="hidden">Conectar YouTube con Google</a>
     <button id="yt-disconnect" type="button" class="hidden">Desconectar YouTube</button>
     <div id="yt-config-info" class="hidden">
-      <p>La integración ya está programada, pero necesita que el propietario configure el cliente OAuth de Google en Render. No introduzcas tus claves en esta página.</p>
+      <p>La integración ya está programada. Para activarla, crea credenciales OAuth de tipo <strong>Aplicación web</strong> en Google Cloud, habilita YouTube Data API v3 y registra el URI de redirección indicado abajo. Después configura <code>YOUTUBE_CLIENT_ID</code> y <code>YOUTUBE_CLIENT_SECRET</code> como variables privadas del servicio en Render. No introduzcas tus claves aquí.</p><p>URI de retorno: <code>https://clipforge-web-dccq.onrender.com/api/publish/youtube/callback</code></p>
       <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style="background:#36557c">Abrir Google Cloud</a>
     </div>
   </div>
