@@ -17,6 +17,53 @@ app=FastAPI(title="ClipForge")
 jobs={}
 mutex=threading.RLock()
 slot=threading.BoundedSemaphore(1)
+JOB_TTL_SECONDS=3600
+JOB_SNAPSHOT_FIELDS=("status","progress","message","created","clips","analysis","topic_hint","output_quality")
+def _persist_job(job_id):
+    """Persist the status in the instance's local volume, with atomic replacement.
+
+    Render Free has ephemeral storage: a new deployment can still lose these files,
+    but a process restart in the *same* instance no longer loses finished jobs.
+    """
+    job=jobs.get(job_id)
+    if not job:return
+    path=Path(job["folder"])/"status.json"
+    if not path.parent.is_dir():return
+    snapshot={key:job.get(key) for key in JOB_SNAPSHOT_FIELDS}
+    tmp=path.with_suffix(".tmp")
+    try:
+        tmp.write_text(json.dumps(snapshot,ensure_ascii=False),encoding="utf-8")
+        os.replace(tmp,path)
+    except OSError:
+        try:tmp.unlink(missing_ok=True)
+        except OSError:pass
+
+def _restore_local_jobs():
+    """Recover completed jobs if the process restarts without losing /tmp."""
+    for folder in ROOT.iterdir():
+        if not folder.is_dir() or not re.fullmatch(r"[a-f0-9]{32}",folder.name):
+            continue
+        path=folder/"status.json"
+        try:
+            if not path.is_file():continue
+            data=json.loads(path.read_text(encoding="utf-8"))
+            if time.time()-float(data["created"])>JOB_TTL_SECONDS:continue
+            if data.get("status")=="done":
+                clips=data.get("clips",[])
+                if not clips or any(not (folder/f"short_{i}.mp4").is_file()
+                                    for i in range(1,len(clips)+1)):
+                    data["status"]="error"
+                    data["message"]="Los MP4 temporales ya no están disponibles. Vuelve a generar los Shorts."
+            elif data.get("status") in ("queued","working"):
+                data["status"]="error"
+                data["progress"]=0
+                data["message"]="El servidor se reinició durante la generación. Vuelve a pulsar Generar Shorts."
+            data.update(folder=str(folder),copy_cache={})
+            jobs[folder.name]=data
+        except (OSError,ValueError,TypeError,KeyError):
+            continue
+
+_restore_local_jobs()
 MAX_DURATION_SECONDS=60*60
 MAX_BYTES=500*1024*1024
 
@@ -89,7 +136,10 @@ def normalize_video_url(raw):
     return parsed._replace(scheme="https", netloc=host).geturl()
 
 def set_status(j,**kw):
-    with mutex:jobs[j].update(kw)
+    with mutex:
+        if j in jobs:
+            jobs[j].update(kw)
+            _persist_job(j)
 
 def download_video(url,folder,output_quality="720"):
     import yt_dlp
@@ -262,7 +312,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
     with mutex:
         now=time.time()
         for key,val in list(jobs.items()):
-            if now-val["created"]>3600 and val["status"] not in ("queued","working"):
+            if now-val["created"]>JOB_TTL_SECONDS and val["status"] not in ("queued","working"):
                 shutil.rmtree(val["folder"],ignore_errors=True);del jobs[key]
         if sum(v["status"] in ("queued","working") for v in jobs.values())>=2:
             raise HTTPException(503,"Servidor ocupado. Vuelve a intentar.")
@@ -283,7 +333,11 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     if size>MAX_BYTES:raise HTTPException(413,"El archivo supera los 500 MB. Usa un archivo más comprimido.")
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
-        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],"copy_cache":{},"output_quality":output_quality}
+        with mutex:
+            jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),
+                     "folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],
+                     "copy_cache":{},"output_quality":output_quality}
+            _persist_job(j)
         threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region,output_quality,subtitles,robot_voice,voice_text),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
@@ -292,8 +346,11 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
 
 @app.get("/api/jobs/{j}")
 def status(j:str):
+    if not re.fullmatch(r"[a-f0-9]{32}",j):
+        raise HTTPException(404,"Identificador de trabajo inválido.")
     with mutex:
-        if j not in jobs:raise HTTPException(404,"Trabajo no encontrado.")
+        if j not in jobs:
+            raise HTTPException(410,"Este trabajo se perdió tras un reinicio o despliegue del servidor. Vuelve a generarlo; si subiste un archivo, selecciónalo de nuevo.")
         d=jobs[j]
         return {k:d[k] for k in ("status","progress","message","clips","analysis")}
 
