@@ -121,6 +121,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
             duration=float(data.get("format",{}).get("duration",0))
             if not math.isfinite(duration) or duration<2 or duration>MAX_DURATION_SECONDS:
                 raise ValueError("El video debe durar entre 2 segundos y 60 minutos.")
+            count=min(count,max(1,int((duration-0.1)//min(length,duration-0.15))))
             smart_data=None
             if smart_mode and manual_start < 0:
                 set_status(j,progress=26,message="Analizando audio, escenas, voz y tendencias actuales...")
@@ -191,7 +192,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                     cmd.extend(["-map","0:a:0?"])
                 cmd.extend(["-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)])
                 command(cmd,230)
-                result={"name":f"Short {i+1}","start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}",
+                result={"name":f"Short {i+1}","ordinal":i+1,"start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}",
                         "subtitles_added":bool(captions_count),"subtitle_blocks":captions_count,
                         "robot_voice_added":bool(audio_path)}
                 if subtitle_text:
@@ -226,7 +227,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True}
 
 @app.get("/api/trends")
 def trends(region:str="CL"):
@@ -241,7 +242,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                  subtitles:bool=Form(False),robot_voice:bool=Form(False),voice_text:str=Form(""),
                  rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
-    if length not in (15,30,45,60) or count not in (1,2,3):raise HTTPException(400,"Parámetros incorrectos.")
+    if length not in (15,30,45,60) or not 1 <= count <= 12:raise HTTPException(400,"Elige entre 1 y 12 clips de 15, 30, 45 o 60 segundos.")
     if not math.isfinite(start) or start < -1 or start > MAX_DURATION_SECONDS:
         raise HTTPException(400,"El segundo de inicio no es válido.")
     if region not in REGIONS: raise HTTPException(400,"Región no válida.")
