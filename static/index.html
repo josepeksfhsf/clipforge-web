@@ -828,7 +828,12 @@ try{
   function display(network,info){
     sessions[network]=info;
     const configured=Boolean(info?.configured),connected=Boolean(info?.connected);
-    el("social-"+network+"-connect").classList.toggle("hidden",!configured||connected);
+    const connectLink=el("social-"+network+"-connect");
+    connectLink.classList.toggle("hidden",connected);
+    connectLink.href=configured?"/api/social/connect/"+network:
+      "https://github.com/josepeksfhsf/clipforge-web/blob/main/SOCIAL_CONNECTIONS_SETUP.md";
+    connectLink.textContent=configured?
+      "Conectar "+(info?.name||network):"Configurar "+(info?.name||network);
     el("social-"+network+"-disconnect").classList.toggle("hidden",!connected);
     let message="";
     if(connected){
