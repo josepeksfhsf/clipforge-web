@@ -418,6 +418,7 @@ function socialJobReady(id,clips){
   });
   $("social-clip").disabled=!readyClips.length;
   $("make-social-copy").disabled=!readyClips.length;
+  if(readyClips.length){$("results").classList.remove("hidden");$("yt-batch-box").classList.remove("hidden");}
   $("social-message").textContent=readyClips.length?"Clips listos. Selecciona la red social y genera tu texto.":"No hay clips disponibles.";try{updateAutoYoutubeSettings()}catch(e){}
 }
 function socialJobSelectClip(number){
@@ -709,6 +710,12 @@ try{
    if(params.get("youtube")==="connected")$("yt-upload-message").textContent="Google autorizó tu cuenta. Ya puedes subir Shorts cuando hayas generado uno.";
    if(params.get("youtube")==="cancelled")$("yt-upload-message").textContent="Se canceló la conexión con Google.";
    history.replaceState(null,"",location.pathname+"#social-hub");
+ }
+ const previousBatch=sessionStorage.getItem("clipforge_youtube_batch");
+ if(previousBatch&&/^[a-f0-9]{32}$/.test(previousBatch)){
+   $("results").classList.remove("hidden");
+   $("yt-batch-box").classList.remove("hidden");
+   monitorYoutubeBatch(previousBatch);
  }
  const saved=sessionStorage.getItem("clipforge_latest_job");
  if(saved&&/^[a-f0-9]{32}$/.test(saved)){
