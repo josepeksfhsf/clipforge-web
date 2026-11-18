@@ -16,7 +16,7 @@ h2{font-size:20px;margin:0 0 9px}.muted{color:#9ca8c8;line-height:1.6;font-size:
 .tab.on{background:#353559;color:white}label{display:block;font-size:14px;font-weight:700;margin:16px 0 8px}
 input[type=text],select{width:100%;padding:14px;border-radius:11px;border:1px solid #43506d;background:#0c1427;color:white;font:inherit;outline:none}
 input:focus,select:focus{border-color:#a480ff}.note{font-size:12px;color:#95a1c2;margin:8px 0}
-.paste-btn{margin-top:10px;padding:10px 15px;background:#262f4c;color:#e9e3ff;border:1px solid #5d5a90;border-radius:10px;font:inherit;font-size:13px;font-weight:750;cursor:pointer}.paste-btn:hover{background:#373c66}.yt-preview{display:flex;align-items:center;gap:12px;background:#101a2d;border:1px solid #42516c;border-radius:12px;padding:12px;margin-top:14px}.yt-preview img{width:106px;aspect-ratio:16/9;object-fit:cover;border-radius:7px}.yt-preview .yt-title{font-size:13px;font-weight:750;margin:0 0 4px}.yt-preview p{color:#a8b5d2;font-size:12px;margin:0;line-height:1.4}.backup{background:#1c3043;border:1px solid #487c8e;border-radius:13px;padding:16px;margin-top:16px}.backup strong{font-size:14px}.backup p{font-size:13px;color:#c1cbda;line-height:1.6}.backup button{border:0;background:#4779b5;color:white;padding:11px 13px;font:inherit;font-weight:750;border-radius:9px;cursor:pointer}.backup a{color:#9edcf3;font-size:13px;margin-left:12px}.source-list{color:#b9a7fd;font-size:12px;margin-top:10px}.file{padding:32px 15px;border:2px dashed #4a567a;text-align:center;border-radius:13px;cursor:pointer;color:#aebcdd;background:#10182b}
+.paste-btn{margin-top:10px;padding:10px 15px;background:#262f4c;color:#e9e3ff;border:1px solid #5d5a90;border-radius:10px;font:inherit;font-size:13px;font-weight:750;cursor:pointer}.paste-btn:hover{background:#373c66}.manual-panel{margin-top:15px;padding:14px;border:1px solid #384968;border-radius:13px;background:#10192c}.manual-panel .inline{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.manual-panel input[type=number]{width:130px;padding:11px;border-radius:9px;border:1px solid #465778;background:#0a1223;color:#fff;font:inherit}.manual-panel button{border:1px solid #665c99;background:#343254;border-radius:9px;padding:9px 12px;font-weight:700;color:white;cursor:pointer}.manual-panel small{color:#a1afd1;display:block;margin-top:8px;font-size:12px;line-height:1.4}.source-video{display:block;width:min(240px,100%);max-height:320px;background:#05070c;border-radius:12px;margin:14px 0}.yt-preview{display:flex;align-items:center;gap:12px;background:#101a2d;border:1px solid #42516c;border-radius:12px;padding:12px;margin-top:14px}.yt-preview img{width:106px;aspect-ratio:16/9;object-fit:cover;border-radius:7px}.yt-preview .yt-title{font-size:13px;font-weight:750;margin:0 0 4px}.yt-preview p{color:#a8b5d2;font-size:12px;margin:0;line-height:1.4}.backup{background:#1c3043;border:1px solid #487c8e;border-radius:13px;padding:16px;margin-top:16px}.backup strong{font-size:14px}.backup p{font-size:13px;color:#c1cbda;line-height:1.6}.backup button{border:0;background:#4779b5;color:white;padding:11px 13px;font:inherit;font-weight:750;border-radius:9px;cursor:pointer}.backup a{color:#9edcf3;font-size:13px;margin-left:12px}.source-list{color:#b9a7fd;font-size:12px;margin-top:10px}.file{padding:32px 15px;border:2px dashed #4a567a;text-align:center;border-radius:13px;cursor:pointer;color:#aebcdd;background:#10182b}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.check{display:flex;align-items:start;gap:11px;margin:20px 0;font-size:13px;font-weight:400;color:#b8c3d9;line-height:1.5}.check input{width:18px;height:18px;accent-color:#946aff}
 button.primary{width:100%;border:0;background:linear-gradient(105deg,#8057eb,#ac5eee);border-radius:13px;padding:17px;color:white;font-size:15px;font-weight:800;cursor:pointer}
 button.primary:disabled{opacity:.55;cursor:wait}.feature{display:flex;gap:14px;margin-top:25px}.icon{font-size:22px;background:#8251e52b;border-radius:12px;display:grid;place-items:center;width:44px;height:44px;flex-shrink:0}.feature strong{font-size:14px}.feature p{font-size:13px;color:#a8b2cd;line-height:1.5;margin:6px 0}.warning{margin-top:24px;border-left:3px solid #58d5b1;background:#204e432e;padding:14px;color:#b5c8d3;font-size:13px;line-height:1.6}
@@ -38,6 +38,11 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <div id="file-area" class="hidden"><label for="file">Selecciona un video</label><label for="file" class="file" id="filename">⬆ Haz clic para subir un MP4, MOV, WebM o MKV (máximo 140 MB)</label><input type="file" id="file" accept="video/*,.mkv,.mov" class="hidden"></div>
 <div class="two"><div><label for="length">Duración</label><select id="length"><option value="15">15 segundos</option><option value="30" selected>30 segundos</option><option value="45">45 segundos</option><option value="60">60 segundos</option></select></div>
 <div><label for="count">Cantidad</label><select id="count"><option value="1">1 clip</option><option value="2" selected>2 clips</option><option value="3">3 clips</option></select></div></div>
+<div class="manual-panel"><label class="check" style="margin:0 0 10px"><input type="checkbox" id="manual-mode"><span><strong>Elegir el segundo exacto de inicio</strong><br><span style="font-weight:400">Desactívalo para seguir usando cortes automáticos.</span></span></label>
+<div id="manual-controls" class="hidden"><div class="inline"><label for="manual-start" style="margin:0">Comenzar en</label><input id="manual-start" type="number" min="0" max="899" step="0.1" value="0"><span>segundos</span><button id="use-playhead" type="button" class="hidden">Usar segundo del video</button></div>
+<small>Si pides varios clips, empezarán uno detrás de otro desde ese segundo. La duración se ajusta automáticamente al final del video.</small></div>
+<video id="source-video" class="source-video hidden" controls preload="metadata" playsinline></video>
+<small id="source-info">Sube un video para ver su duración y elegir el momento exacto.</small></div>
 <label for="title">Texto en pantalla (opcional)</label><input id="title" maxlength="80" placeholder="¡No te esperabas este final!">
 <label class="check"><input id="rights" type="checkbox" required><span>Confirmo que tengo autorización para utilizar, editar y publicar este material.</span></label>
 <button class="primary" id="submit" type="submit">✦ Generar Shorts gratis</button></form>
@@ -55,7 +60,25 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales. Los fragmentos se eligen por intervalos, no por IA semántica, y no incluyen subtítulos automáticos. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
 <footer>ClipForge Web · Usa únicamente contenido propio o autorizado. La monetización depende de las políticas de YouTube.</footer>
 </div><script>
-const $=id=>document.getElementById(id);let mode="url",interval;
+const $=id=>document.getElementById(id);let mode="url",interval,objectVideoURL=null;
+function updateManualControls(){
+ const active=$("manual-mode").checked;
+ $("manual-controls").classList.toggle("hidden",!active);
+ $("use-playhead").classList.toggle("hidden",!(active&&mode==="file"&&$("file").files.length));
+}
+$("manual-mode").addEventListener("change",updateManualControls);
+$("use-playhead").addEventListener("click",()=>{
+ $("manual-mode").checked=true;
+ $("manual-start").value=($("source-video").currentTime||0).toFixed(1);
+ updateManualControls();
+});
+$("source-video").addEventListener("loadedmetadata",()=>{
+ const duration=$("source-video").duration;
+ if(Number.isFinite(duration)){
+  $("manual-start").max=Math.max(0,(duration-2.1)).toFixed(1);
+  $("source-info").textContent="Duración: "+duration.toFixed(1)+" s. Pausa el video y pulsa «Usar segundo del video».";
+ }
+});
 function cleanPastedLink(value){
   const text=(value||"").trim();
   const found=text.match(/https?:\/\/[^\s<>"']+|(?:www\.|youtube\.com\/|youtu\.be\/|tiktok\.com\/|instagram\.com\/|facebook\.com\/|vimeo\.com\/)[^\s<>"']+/i);
@@ -101,14 +124,35 @@ $("paste-url").addEventListener("click",async()=>{
   $("linkhint").textContent="Tu navegador no autorizó leer el portapapeles. Usa Ctrl+V dentro del campo.";
  }
 });
-function switchMode(m){mode=m;$("tab-url").classList.toggle("on",m==="url");$("tab-file").classList.toggle("on",m==="file");$("url-area").classList.toggle("hidden",m!=="url");$("file-area").classList.toggle("hidden",m!=="file")}
+function switchMode(m){mode=m;$("tab-url").classList.toggle("on",m==="url");$("tab-file").classList.toggle("on",m==="file");$("url-area").classList.toggle("hidden",m!=="url");$("file-area").classList.toggle("hidden",m!=="file");updateManualControls()}
 $("tab-url").onclick=()=>switchMode("url");$("tab-file").onclick=()=>switchMode("file");
-$("file").onchange=()=>{$("filename").textContent=$("file").files[0]?.name||"Seleccionar archivo"};
+$("file").onchange=()=>{
+ const file=$("file").files[0];
+ $("filename").textContent=file?.name||"Seleccionar archivo";
+ if(objectVideoURL){URL.revokeObjectURL(objectVideoURL);objectVideoURL=null;}
+ if(file){
+  objectVideoURL=URL.createObjectURL(file);
+  $("source-video").src=objectVideoURL;
+  $("source-video").classList.remove("hidden");
+  $("source-info").textContent="Cargando vista previa...";
+ }else{
+  $("source-video").removeAttribute("src");
+  $("source-video").classList.add("hidden");
+  $("source-info").textContent="Sube un video para ver su duración y elegir el momento exacto.";
+ }
+ updateManualControls();
+};
 function setStatus(m,p){$("results").classList.remove("hidden");$("status").textContent=m;$("bar").style.width=(p||0)+"%"}
 async function poll(id){try{const res=await fetch("/api/jobs/"+encodeURIComponent(id),{cache:"no-store"});const data=await res.json();if(!res.ok)throw Error(data.detail||"No se pudo consultar");setStatus(data.message,data.progress);if(data.status==="done"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="✦ Generar más Shorts";$("cards").replaceChildren();for(const c of data.clips){let e=document.createElement("div");e.className="clip";let v=document.createElement("video");v.controls=true;v.preload="none";v.src=c.url;let info=document.createElement("div");info.className="clipinfo";let b=document.createElement("b");b.textContent=c.name;let t=document.createElement("div");t.textContent="Desde "+c.start+" s · "+c.length+" s";let a=document.createElement("a");a.href=c.url;a.className="download";a.download="ClipForge_"+c.name.replaceAll(" ","_")+".mp4";a.textContent="⬇ Descargar MP4";info.append(b,t,a);e.append(v,info);$("cards").append(e)}}if(data.status==="error"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
 const msg=(data.message||"").toLowerCase();
 if(msg.includes("bloque")||msg.includes("youtube")||msg.includes("plataforma")||msg.includes("iniciar sesión")||msg.includes("privado")){
 $("backup").classList.remove("hidden");}}}catch(e){clearInterval(interval);setStatus(e.message,0);$("submit").disabled=false}}
 $("form").onsubmit=async e=>{e.preventDefault();clearInterval(interval);if(mode==="url"&&!$("url").value.trim()){setStatus("Pega un enlace a un video público.",0);return}if(mode==="file"&&!$("file").files.length){setStatus("Selecciona un video.",0);return}if(!$("rights").checked){setStatus("Confirma los derechos del video.",0);return}
-$("submit").disabled=true;$("submit").textContent="Procesando...";$("cards").replaceChildren();$("backup").classList.add("hidden");setStatus("Comprobando el enlace y enviando al servidor...",5);const body=new FormData();body.append("url",mode==="url"?cleanPastedLink($("url").value):"");if(mode==="file")body.append("file",$("file").files[0]);body.append("length",$("length").value);body.append("count",$("count").value);body.append("title",$("title").value);body.append("rights","true");try{const response=await fetch("/api/jobs",{method:"POST",body});const data=await response.json();if(!response.ok)throw Error(data.detail||"No se pudo comenzar.");await poll(data.id);if($("submit").disabled)interval=setInterval(()=>poll(data.id),2500)}catch(e){setStatus(e.message,0);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}};
+$("submit").disabled=true;$("submit").textContent="Procesando...";$("cards").replaceChildren();$("backup").classList.add("hidden");setStatus("Comprobando el enlace y enviando al servidor...",5);const body=new FormData();body.append("url",mode==="url"?cleanPastedLink($("url").value):"");if(mode==="file")body.append("file",$("file").files[0]);body.append("length",$("length").value);body.append("count",$("count").value);body.append("title",$("title").value);
+if($("manual-mode").checked){
+ const start=Number($("manual-start").value);
+ if(!Number.isFinite(start)||start<0||start>900){setStatus("Elige un segundo válido.",0);$("submit").disabled=false;return}
+ body.append("start",String(start));
+}else body.append("start","-1");
+body.append("rights","true");try{const response=await fetch("/api/jobs",{method:"POST",body});const data=await response.json();if(!response.ok)throw Error(data.detail||"No se pudo comenzar.");await poll(data.id);if($("submit").disabled)interval=setInterval(()=>poll(data.id),2500)}catch(e){setStatus(e.message,0);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}};
 </script></body></html>
