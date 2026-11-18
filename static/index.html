@@ -269,6 +269,11 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <footer>ClipForge Web · Usa únicamente contenido propio o autorizado. La monetización depende de las políticas de YouTube.</footer>
 </div><script>
 const $=id=>document.getElementById(id);let mode="url",interval,objectVideoURL=null,activeJobId=null;
+let jobPollBusy=false,jobPollFailures=0;
+function stopJobPolling(){
+  clearInterval(interval);interval=null;
+  try{sessionStorage.removeItem("clipforge_processing_job")}catch(e){}
+}
 async function refreshTrends(){
  const region=$("trend-region").value;
  $("trend-status").textContent="Consultando búsquedas recientes de Google Trends...";
@@ -381,7 +386,17 @@ $("file").onchange=()=>{
  updateManualControls();
 };
 function setStatus(m,p){$("results").classList.remove("hidden");$("status").textContent=m;$("bar").style.width=(p||0)+"%"}
-async function poll(id){try{const res=await fetch("/api/jobs/"+encodeURIComponent(id),{cache:"no-store"});const data=await res.json();if(!res.ok)throw Error(data.detail||"No se pudo consultar");setStatus(data.message,data.progress);if(data.status==="done"){socialJobReady(id,data.clips);clearInterval(interval);$("submit").disabled=false;$("submit").textContent="✦ Generar más Shorts";$("cards").replaceChildren();for(const c of data.clips){let e=document.createElement("div");e.className="clip";let v=document.createElement("video");v.controls=true;v.preload="none";v.src=c.url;let info=document.createElement("div");info.className="clipinfo";let b=document.createElement("b");b.textContent=c.name;let t=document.createElement("div");t.textContent="Desde "+c.start+" s · "+c.length+" s · "+(c.quality||"HD");let a=document.createElement("a");a.href=c.url;a.className="download";a.download="ClipForge_"+c.name.replaceAll(" ","_")+".mp4";a.textContent="⬇ Descargar MP4";info.append(b,t);
+async function poll(id){
+ if(jobPollBusy)return;
+ jobPollBusy=true;
+ let httpStatus=0;
+ try{
+  const res=await fetch("/api/jobs/"+encodeURIComponent(id),{cache:"no-store"});
+  httpStatus=res.status;
+  const data=await res.json();
+  if(!res.ok)throw Error(data.detail||"No se pudo consultar el trabajo");
+  jobPollFailures=0;
+  setStatus(data.message,data.progress);if(data.status==="done"){socialJobReady(id,data.clips);stopJobPolling();$("submit").disabled=false;$("submit").textContent="✦ Generar más Shorts";$("cards").replaceChildren();for(const c of data.clips){let e=document.createElement("div");e.className="clip";let v=document.createElement("video");v.controls=true;v.preload="none";v.src=c.url;let info=document.createElement("div");info.className="clipinfo";let b=document.createElement("b");b.textContent=c.name;let t=document.createElement("div");t.textContent="Desde "+c.start+" s · "+c.length+" s · "+(c.quality||"HD");let a=document.createElement("a");a.href=c.url;a.className="download";a.download="ClipForge_"+c.name.replaceAll(" ","_")+".mp4";a.textContent="⬇ Descargar MP4";info.append(b,t);
 if(Number.isFinite(c.score)){
  const score=document.createElement("div");score.className="scoreline";score.textContent="Potencial estimado: "+c.score+"/100";info.append(score);
  const why=document.createElement("div");why.className="scoreinfo";
@@ -414,10 +429,23 @@ generateClipMetadata(id,currentNumber,preview);
 e.append(v,info);$("cards").append(e)}
 $("yt-batch-box").classList.remove("hidden");
 if(ytAutoRequested)publishYoutubeBatch(id,true);
-}if(data.status==="error"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
+}if(data.status==="error"){stopJobPolling();$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
 const msg=(data.message||"").toLowerCase();
 if(msg.includes("bloque")||msg.includes("youtube")||msg.includes("plataforma")||msg.includes("iniciar sesión")||msg.includes("privado")){
-$("backup").classList.remove("hidden");}}}catch(e){clearInterval(interval);setStatus(e.message,0);$("submit").disabled=false}}
+$("backup").classList.remove("hidden");}}}catch(e){
+ if(httpStatus===404||httpStatus===410){
+   stopJobPolling();activeJobId=null;
+   setStatus("⚠ La generación se interrumpió porque Render reinició el servidor. Pulsa «Volver a generar». Si actualizaste la página, vuelve a seleccionar el archivo de origen.",0);
+   $("submit").disabled=false;$("submit").textContent="↻ Volver a generar";
+ }else if(++jobPollFailures<=3){
+   setStatus("Reconectando con el servidor... "+jobPollFailures+"/3 (no cierres la página)",5);
+ }else{
+   stopJobPolling();activeJobId=null;
+   setStatus("No pudimos comprobar el progreso tras varios intentos. Comprueba tu conexión y vuelve a generar.",0);
+   $("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo";
+ }
+ }finally{jobPollBusy=false}
+}
 $("form").onsubmit=async e=>{e.preventDefault();clearInterval(interval);if(mode==="url"&&!$("url").value.trim()){setStatus("Pega un enlace a un video público.",0);return}if(mode==="file"&&!$("file").files.length){setStatus("Selecciona un video.",0);return}if(mode==="file"&&$("file").files[0].size>500*1024*1024){setStatus("El archivo supera 500 MB.",0);return}if(!$("rights").checked){setStatus("Confirma los derechos del video.",0);return}
 if($("yt-auto-upload").checked){
   const options=getYoutubeBatchOptions();
@@ -453,7 +481,12 @@ const data=await new Promise((resolve,reject)=>{
   xhr.onabort=()=>reject(Error("La subida fue interrumpida."));
   xhr.send(body);
 });
-activeJobId=data.id;socialJobReset();await poll(data.id);if($("submit").disabled)interval=setInterval(()=>poll(data.id),2500)}catch(e){setStatus(e.message,0);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}};
+activeJobId=data.id;
+jobPollFailures=0;
+try{sessionStorage.setItem("clipforge_processing_job",data.id)}catch(e){}
+socialJobReset();
+await poll(data.id);
+if($("submit").disabled)interval=setInterval(()=>poll(data.id),3000)}catch(e){setStatus(e.message,0);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}};
 </script>
 <script>
 let readyClips=[], socialJob="", latestSocial=null;
@@ -811,6 +844,14 @@ try{
    $("results").classList.remove("hidden");
    $("yt-batch-box").classList.remove("hidden");
    monitorYoutubeBatch(previousBatch);
+ }
+ const processing=sessionStorage.getItem("clipforge_processing_job");
+ if(processing&&/^[a-f0-9]{32}$/.test(processing)){
+   $("submit").disabled=true;
+   setStatus("Restableciendo el seguimiento de tu generación...",5);
+   poll(processing).then(()=>{
+     if($("submit").disabled)interval=setInterval(()=>poll(processing),3000);
+   });
  }
  const saved=sessionStorage.getItem("clipforge_latest_job");
  if(saved&&/^[a-f0-9]{32}$/.test(saved)){
