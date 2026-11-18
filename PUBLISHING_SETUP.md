@@ -26,6 +26,16 @@
 7. Genera un Short, pulsa **Crear texto para publicar**, revisa título y descripción; en **Publicar en YouTube** elige visibilidad (por defecto *Privado*), indica si está dirigido a niños y si contiene material sintético realista, confirma que tienes los derechos y pulsa **Publicar en YouTube desde ClipForge**.
 8. ClipForge sube el MP4 con la API oficial, y entrega el enlace tras recibir el ID de YouTube. YouTube puede continuar procesando el video una vez recibido.
 
+## Publicación con los nuevos botones
+
+Después de autorizar tu cuenta de Google, la interfaz ofrece tres formas:
+
+1. **▶ Publicar en YouTube**, debajo de cada clip generado: selecciona ese clip y genera su título y descripción. El panel de YouTube permite revisar visibilidad, contenido para niños y contenido sintético antes de confirmarlo.
+2. **🚀 Publicar todos los Shorts en YouTube**, debajo del conjunto de resultados: confirma una sola vez los ajustes y ClipForge prepara títulos y descripciones para todos y los envía de forma secuencial.
+3. **🚀 Subir automáticamente mis Shorts a YouTube**, en el formulario antes de generar: marca la opción, selecciona privacidad (por defecto privada), responde las preguntas sobre público infantil y medios sintéticos, y confirma la autorización. Cuando termina de generar, la página inicia la publicación de todos los clips automáticamente. **Mantén abierta la pestaña hasta que empiece la subida**; después el servidor continúa mientras la instancia de Render esté activa.
+
+El estado y los enlaces de cada subida aparecen en la sección de resultados. La publicación puede fallar por cuota de API, revisión de la app de Google, permisos insuficientes o reinicio del servicio; no se publica sin autorización. No relances un lote parcialmente completado sin revisar antes en YouTube Studio para evitar duplicados.
+
 ## Qué NO hace esta versión
 
 - No se salta verificaciones antibots de YouTube ni descarga videos privados o no autorizados.
