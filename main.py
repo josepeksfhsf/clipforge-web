@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from smart_engine import choose_clips, fetch_trends, REGIONS
 from social_studio import create_social_copy, PLATFORMS, STYLES
 from youtube_publisher import install_youtube_publisher
+from social_connections import install_social_connections
 from media_enhance import make_subtitles, make_robot_voice, subtitle_filter
 
 BASE=Path(__file__).parent
@@ -351,5 +352,6 @@ def clip(j:str,number:int):
     return FileResponse(path,media_type="video/mp4",filename=f"ClipForge_Short_{number}.mp4")
 
 install_youtube_publisher(app,jobs,mutex)
+install_social_connections(app)
 
 app.mount("/",StaticFiles(directory=str(BASE/"static"),html=True),name="site")
