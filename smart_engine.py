@@ -132,7 +132,7 @@ def transcribe_excerpt(path, start, seconds=22):
     with _MODEL_LOCK:
         if _MODEL is None:
             from faster_whisper import WhisperModel
-            _MODEL=WhisperModel("tiny",device="cpu",compute_type="int8",cpu_threads=1,num_workers=1,download_root="/app/models")
+            _MODEL=WhisperModel("tiny",device="cpu",compute_type="int8",cpu_threads=1,num_workers=1,download_root="/app/models",local_files_only=True)
         model=_MODEL
         import tempfile
         with tempfile.TemporaryDirectory() as root:
