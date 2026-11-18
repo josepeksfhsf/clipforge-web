@@ -90,6 +90,13 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 .editing-options input[type=text]{font-size:13px}
 .editing-options .check{margin:11px 0}
 .metadata-preview{color:#b1dfce;font-size:12px;line-height:1.5;margin-top:11px;overflow-wrap:anywhere;white-space:pre-line}
+
+.social-oauth-card{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between}
+.social-oauth-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.social-oauth-card .conn-link{font-size:12px;white-space:nowrap;padding:9px 12px;display:inline-flex;border-radius:9px}
+.social-oauth-card .conn-link.hidden{display:none!important}
+.social-oauth-card .social-logout{font:inherit;font-size:12px;border:1px solid #975369;background:#372338;color:#f7d8d8;border-radius:9px;padding:9px 12px;cursor:pointer}
+.social-oauth-card .social-logout.hidden{display:none!important}
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
@@ -193,12 +200,24 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
       <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style="background:#36557c">Abrir Google Cloud</a><p><a href="https://github.com/josepeksfhsf/clipforge-web/blob/main/PUBLISHING_SETUP.md" target="_blank" rel="noopener noreferrer" style="background:#36557c">Ver guía paso a paso</a></p>
     </div>
   </div>
-  <div class="connection-card"><div><strong>♪ TikTok</strong><div><span>Permisos de publicación directa aún no configurados en ClipForge</span></div></div><span>Próximo</span></div>
-  <div class="connection-card"><div><strong>◎ Instagram</strong><div><span>Requiere cuenta profesional y permisos oficiales de Meta</span></div></div><span>Próximo</span></div>
-  <div class="connection-card"><div><strong>f Facebook</strong><div><span>Requiere permisos de publicación para tu página</span></div></div><span>Próximo</span></div>
+
+  <div class="connection-card social-oauth-card">
+    <div><strong>◎ Instagram</strong><div><span id="social-instagram-message">Comprobando autorización...</span></div></div>
+    <div class="social-oauth-controls"><a class="conn-link hidden" id="social-instagram-connect" href="/api/social/connect/instagram">Conectar Instagram</a><button class="social-logout hidden" id="social-instagram-disconnect" type="button">Desconectar</button></div>
+  </div>
+  <div class="connection-card social-oauth-card">
+    <div><strong>♪ TikTok</strong><div><span id="social-tiktok-message">Comprobando autorización...</span></div></div>
+    <div class="social-oauth-controls"><a class="conn-link hidden" id="social-tiktok-connect" href="/api/social/connect/tiktok">Conectar TikTok</a><button class="social-logout hidden" id="social-tiktok-disconnect" type="button">Desconectar</button></div>
+  </div>
+  <div class="connection-card social-oauth-card">
+    <div><strong>f Facebook</strong><div><span id="social-facebook-message">Comprobando autorización...</span></div></div>
+    <div class="social-oauth-controls"><a class="conn-link hidden" id="social-facebook-connect" href="/api/social/connect/facebook">Conectar Facebook</a><button class="social-logout hidden" id="social-facebook-disconnect" type="button">Desconectar</button></div>
+  </div>
+  <p id="social-oauth-feedback" class="fineprint" role="status" aria-live="polite"></p>
+  <p class="fineprint">Las conexiones requieren credenciales de desarrollador y autorización de las plataformas. <a href="https://github.com/josepeksfhsf/clipforge-web/blob/main/SOCIAL_CONNECTIONS_SETUP.md" target="_blank" rel="noopener noreferrer">Guía para conectar Instagram, TikTok y Facebook</a>. No introduzcas contraseñas ni secretos en esta página.</p>
   <a class="conn-link" href="https://app.metricool.com/brands/connections" target="_blank" rel="noopener noreferrer">Administrar redes ya conectadas en Metricool ↗</a>
   <div class="auto-state"><strong>Publicación directa: YouTube, tras configurar y autorizar OAuth.</strong>
-  <div>TikTok, Instagram y Facebook todavía no publican automáticamente desde ClipForge. Metricool conectado en ChatGPT no da permisos al servidor web; sus permisos y API son independientes. No se enviará ningún video sin tu confirmación.</div></div>
+  <div>Instagram, TikTok y Facebook tienen conexión OAuth programada, pero aún no publican videos desde ClipForge. La publicación requiere permisos independientes y aprobaciones adicionales. Conectar una cuenta no autoriza publicar.</div></div>
  </section>
  <section class="social-subpanel social-tools">
   <h3>✨ Generador de títulos y descripciones</h3>
@@ -800,5 +819,69 @@ try{
    }).catch(()=>{});
  }
 }catch(e){}
+</script>
+<script>
+(function(){
+  const networks=["instagram","tiktok","facebook"];
+  let sessions={};
+  const el=(id)=>document.getElementById(id);
+  function display(network,info){
+    sessions[network]=info;
+    const configured=Boolean(info?.configured),connected=Boolean(info?.connected);
+    el("social-"+network+"-connect").classList.toggle("hidden",!configured||connected);
+    el("social-"+network+"-disconnect").classList.toggle("hidden",!connected);
+    let message="";
+    if(connected){
+      message="✓ Conectada: "+(info.display_name||"cuenta autorizada");
+      if(network==="facebook")
+        message+=(info.pages?.length?" · "+info.pages.length+" página(s) administrada(s)":" · sin páginas administradas");
+      message+=" · Publicación pendiente de autorización";
+    }else if(configured){
+      message="Lista para conectar. "+(info.connection_note||"");
+    }else message="Faltan las credenciales oficiales de desarrollador. Consulta la guía de activación.";
+    el("social-"+network+"-message").textContent=message;
+  }
+  async function refresh(){
+    try{
+      const response=await fetch("/api/social/connections",{cache:"no-store",credentials:"same-origin"});
+      if(!response.ok)throw Error("No se pudo consultar las conexiones");
+      const data=await response.json();
+      networks.forEach(n=>display(n,data.platforms?.[n]));
+    }catch(e){
+      networks.forEach(n=>el("social-"+n+"-message").textContent="No se pudo comprobar la conexión. Actualiza la página.");
+    }
+  }
+  for(const n of networks){
+    el("social-"+n+"-disconnect").addEventListener("click",async()=>{
+      const data=sessions[n];
+      if(!data?.connected||!confirm("¿Desconectar "+data.name+" de ClipForge? No revoca el permiso en "+data.name+"."))return;
+      try{
+        const r=await fetch("/api/social/disconnect/"+n,{
+          method:"POST",credentials:"same-origin",headers:{"X-ClipForge-CSRF":data.csrf}
+        });
+        const payload=await r.json();
+        if(!r.ok)throw Error(payload.detail||"No se pudo desconectar.");
+        el("social-oauth-feedback").textContent="Cuenta desconectada de ClipForge.";
+        await refresh();
+      }catch(e){el("social-oauth-feedback").textContent="Error: "+String(e.message||"Inténtalo de nuevo.");}
+    });
+  }
+  const params=new URLSearchParams(location.search);
+  for(const kind of ["social_connected","social_cancelled","social_error","social_setup"]){
+    const platform=params.get(kind);
+    if(!networks.includes(platform))continue;
+    const results={
+      social_connected:"✓ Conexión autorizada. La cuenta se muestra a continuación.",
+      social_cancelled:"Autorización cancelada. No se conectó la cuenta.",
+      social_error:"No fue posible conectar la cuenta. Comprueba los permisos y la dirección de retorno en la consola de desarrolladores.",
+      social_setup:"Esta red necesita las credenciales oficiales de desarrollador. Revisa la guía."
+    };
+    el("social-oauth-feedback").textContent=results[kind];
+    el("social-hub").scrollIntoView({behavior:"smooth",block:"start"});
+    history.replaceState(null,"",location.pathname+"#social-hub");
+    break;
+  }
+  refresh();
+})();
 </script>
 </body></html>
