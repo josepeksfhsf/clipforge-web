@@ -48,7 +48,7 @@ def make_subtitles(source: Path, start: float, length: float, target: Path):
                 smart._MODEL=WhisperModel("tiny",device="cpu",compute_type="int8",
                                          cpu_threads=1,num_workers=1,download_root="/app/models")
             segments,_=smart._MODEL.transcribe(str(wav),beam_size=1,best_of=1,
-                         condition_on_previous_text=False,vad_filter=True)
+                         condition_on_previous_text=False,vad_filter=True,language="es")
             captions=[]
             transcript=[]
             for seg in segments:
@@ -78,7 +78,8 @@ def make_subtitles(source: Path, start: float, length: float, target: Path):
             blocks.append(f"{n}\n{_srt_time(a)} --> {_srt_time(b)}\n{safe}\n")
         target.write_text("\n".join(blocks),encoding="utf-8")
         return " ".join(transcript)[:650],len(blocks)
-    except Exception:
+    except Exception as exc:
+        print("subtitle_generation_error:",type(exc).__name__,flush=True)
         return "",0
     finally:
         try:wav.unlink(missing_ok=True)
