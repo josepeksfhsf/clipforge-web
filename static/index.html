@@ -397,6 +397,8 @@ let readyClips=[], socialJob="", latestSocial=null;
 function socialJobReset(){
   readyClips=[];socialJob="";latestSocial=null;
   $("yt-batch-box").classList.add("hidden");$("yt-batch-status").replaceChildren();
+  $("yt-batch-now").disabled=false;
+  try{sessionStorage.removeItem("clipforge_youtube_batch")}catch(e){}
   $("social-clip").replaceChildren();
   const option=document.createElement("option");option.textContent="Genera un video primero";option.value="";
   $("social-clip").append(option);
@@ -416,7 +418,7 @@ function socialJobReady(id,clips){
   });
   $("social-clip").disabled=!readyClips.length;
   $("make-social-copy").disabled=!readyClips.length;
-  $("social-message").textContent=readyClips.length?"Clips listos. Selecciona la red social y genera tu texto.":"No hay clips disponibles.";
+  $("social-message").textContent=readyClips.length?"Clips listos. Selecciona la red social y genera tu texto.":"No hay clips disponibles.";try{updateAutoYoutubeSettings()}catch(e){}
 }
 function socialJobSelectClip(number){
   if(!readyClips.length)return;
@@ -493,6 +495,9 @@ $("share-social").addEventListener("click",async()=>{
 <script>
 let ytAuth={configured:false,connected:false,csrf:null};
 let ytPollTimer=null;
+let ytAutoRequested=false;
+const batchStartedJobs=new Set();
+let ytBatchPoll=null;
 async function refreshYoutubeConnection(){
   try {
     const response=await fetch("/api/publish/youtube/status",{cache:"no-store",credentials:"same-origin"});
@@ -509,6 +514,7 @@ async function refreshYoutubeConnection(){
     $("yt-connection-message").textContent="No se pudo comprobar la conexión de YouTube.";
   }
   updateYoutubePublishPanel();
+  updateAutoYoutubeSettings();
 }
 function updateYoutubePublishPanel(){
   const isYoutube=$("social-platform").value==="youtube";
@@ -520,6 +526,114 @@ function updateYoutubePublishPanel(){
      ytAuth.configured?"Pulsa «Conectar YouTube con Google» en el panel izquierdo. Después genera de nuevo el título si hace falta.":
      "La función está programada, pero no puede publicar hasta que se configuren el cliente y secreto OAuth de Google en Render.";
 }
+
+function updateAutoYoutubeSettings(){
+  const enabled=$("yt-auto-upload").checked;
+  $("yt-auto-settings").classList.toggle("hidden",!enabled);
+  $("yt-auto-login").classList.toggle("hidden",!ytAuth.configured||ytAuth.connected);
+  $("yt-auto-connect").textContent=ytAuth.connected?
+    "✓ YouTube conectado. Puedes autorizar la subida automática de hasta tres Shorts.":
+    ytAuth.configured?"Antes de publicar, conecta YouTube con Google usando el botón de abajo.":
+    "El administrador todavía debe configurar las credenciales de Google.";
+  $("yt-batch-start-existing").classList.toggle("hidden",!enabled||!readyClips.length);
+}
+$("yt-auto-upload").addEventListener("change",updateAutoYoutubeSettings);
+function getYoutubeBatchOptions(){
+  if(!$("yt-auto-kids").value||!$("yt-auto-synthetic").value)return null;
+  return {privacy:$("yt-auto-privacy").value,
+    for_kids:$("yt-auto-kids").value==="yes",
+    altered_media:$("yt-auto-synthetic").value==="yes",
+    style:$("social-style").value,
+    topic:$("social-topic").value.trim().slice(0,95)};
+}
+function appendYoutubeBatchLinks(videos){
+  const area=$("yt-batch-status");
+  area.replaceChildren();
+  for(const item of videos||[]){
+    const line=document.createElement("div");
+    const a=document.createElement("a");
+    a.href=item.url;a.target="_blank";a.rel="noopener noreferrer";
+    a.textContent="✓ Short "+item.number+" en YouTube";
+    line.append(a);area.append(line);
+  }
+}
+async function monitorYoutubeBatch(uploadId){
+  clearInterval(ytBatchPoll);
+  const update=async()=>{
+    try{
+      const response=await fetch("/api/publish/youtube/uploads/"+encodeURIComponent(uploadId),{
+        credentials:"same-origin",cache:"no-store"
+      });
+      const data=await response.json();
+      if(!response.ok)throw Error(data.detail||"No fue posible consultar el estado.");
+      $("yt-batch-hint").textContent=data.message+
+        " "+(data.completed||0)+"/"+(data.total||"?")+" clips confirmados · "+data.progress+" %";
+      appendYoutubeBatchLinks(data.videos);
+      if(data.status==="done"||data.status==="error"){
+        clearInterval(ytBatchPoll);ytBatchPoll=null;
+        if(data.status==="error")$("yt-batch-hint").textContent="⚠ "+data.message+
+          " · Ya publicados: "+(data.completed||0)+". No reintentes a ciegas para evitar duplicados.";
+        else $("yt-batch-hint").textContent="✓ Subida completada. Los videos pueden seguir procesándose en YouTube.";
+        try{sessionStorage.removeItem("clipforge_youtube_batch")}catch(e){}
+      }
+    }catch(e){
+      clearInterval(ytBatchPoll);ytBatchPoll=null;
+      $("yt-batch-hint").textContent="No se pudo comprobar la subida: "+e.message+
+        ". Verifica en YouTube Studio antes de volver a intentar.";
+    }
+  };
+  await update();
+  if(ytBatchPoll===null&&$("yt-batch-hint").textContent.includes("clips confirmados"))
+     ytBatchPoll=setInterval(update,3500);
+}
+async function publishYoutubeBatch(jobId,wasAuthorizedAtGeneration=false){
+  if(!jobId||batchStartedJobs.has(jobId))return;
+  $("yt-batch-box").classList.remove("hidden");
+  if(!ytAuth.connected){
+    $("yt-batch-hint").textContent="Conecta tu canal de YouTube en Redes sociales antes de publicar.";
+    $("social-hub").scrollIntoView({behavior:"smooth"});
+    return;
+  }
+  const options=getYoutubeBatchOptions();
+  if(!options){
+    $("yt-batch-hint").textContent="Antes de publicar, elige si los clips son para niños o contienen material sintético realista.";
+    $("yt-auto-upload").checked=true;
+    updateAutoYoutubeSettings();
+    $("auto-youtube").scrollIntoView({behavior:"smooth"});
+    return;
+  }
+  if(!wasAuthorizedAtGeneration){
+    const ok=confirm("¿Autorizas subir ahora los "+readyClips.length+
+      " Shorts a YouTube con visibilidad «"+$("yt-auto-privacy").selectedOptions[0].text+
+      "», títulos y descripciones generados automáticamente? Confirma que tienes los derechos de todos los clips.");
+    if(!ok)return;
+  }
+  batchStartedJobs.add(jobId);
+  $("yt-batch-now").disabled=true;
+  $("yt-batch-hint").textContent="Solicitando la publicación de todos los Shorts...";
+  try{
+    const response=await fetch("/api/publish/youtube/batch",{
+      method:"POST",credentials:"same-origin",
+      headers:{"Content-Type":"application/json","X-ClipForge-CSRF":ytAuth.csrf},
+      body:JSON.stringify({job_id:jobId,...options,confirmed:true})
+    });
+    const d=await response.json();
+    if(!response.ok)throw Error(d.detail||"No se pudieron enviar los clips.");
+    $("yt-batch-hint").textContent="Subida iniciada. Los clips se están enviando a YouTube...";
+    try{sessionStorage.setItem("clipforge_youtube_batch",d.upload_id)}catch(e){}
+    await monitorYoutubeBatch(d.upload_id);
+  }catch(e){
+    $("yt-batch-hint").textContent="Error al iniciar la subida: "+e.message;
+    batchStartedJobs.delete(jobId);
+    $("yt-batch-now").disabled=false;
+  }
+}
+$("yt-batch-now").addEventListener("click",()=>{
+  $("yt-auto-upload").checked=true;
+  updateAutoYoutubeSettings();
+  publishYoutubeBatch(socialJob,false);
+});
+$("yt-batch-start-existing").addEventListener("click",()=>publishYoutubeBatch(socialJob,false));
 $("yt-disconnect").addEventListener("click",async()=>{
  if(!ytAuth.connected)return;
  try{
