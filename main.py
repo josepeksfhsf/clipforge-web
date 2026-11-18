@@ -102,7 +102,7 @@ def download_video(url,folder):
     if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera 140 MB.")
     return result
 
-def render(j,url,uploaded,length,count,title):
+def render(j,url,uploaded,length,count,title,manual_start):
     work=Path(jobs[j]["folder"])
     try:
         with slot:
@@ -115,11 +115,18 @@ def render(j,url,uploaded,length,count,title):
             duration=float(data.get("format",{}).get("duration",0))
             if not math.isfinite(duration) or duration<2 or duration>900:
                 raise ValueError("El video debe durar entre 2 segundos y 15 minutos.")
-            actual=min(length,duration-0.1)
-            count=min(count,max(1,int(duration//actual)))
+            if manual_start >= 0:
+                if manual_start >= duration-2:
+                    raise ValueError("El segundo de inicio debe dejar al menos 2 segundos de video.")
+                actual=min(length,duration-manual_start-0.1)
+                count=min(count,max(1,int((duration-manual_start)//actual)))
+                starts=[round(manual_start+i*actual,2) for i in range(count)]
+            else:
+                actual=min(length,duration-0.1)
+                count=min(count,max(1,int(duration//actual)))
+                starts=[max(0,round((i+0.5)*duration/count-actual/2,2)) for i in range(count)]
             clips=[]
-            for i in range(count):
-                start=max(0,round((i+0.5)*duration/count-actual/2,2))
+            for i,start in enumerate(starts):
                 set_status(j,progress=30+int(i/count*60),message=f"Creando clip {i+1} de {count}...")
                 out=work/f"short_{i+1}.mp4"
                 vf="scale=540:960:force_original_aspect_ratio=increase,crop=540:960,setsar=1,format=yuv420p"
@@ -157,9 +164,12 @@ def health():return {"status":"ok","service":"ClipForge Web"}
 
 @app.post("/api/jobs",status_code=202)
 async def create(url:str=Form(""),file:UploadFile|None=File(None),
-                 length:int=Form(30),count:int=Form(2),title:str=Form(""),rights:bool=Form(False)):
+                 length:int=Form(30),count:int=Form(2),title:str=Form(""),
+                 start:float=Form(-1),rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or count not in (1,2,3):raise HTTPException(400,"Parámetros incorrectos.")
+    if not math.isfinite(start) or start < -1 or start > 900:
+        raise HTTPException(400,"El segundo de inicio no es válido.")
     if bool(url.strip())==bool(file and file.filename):raise HTTPException(400,"Elige un enlace o un archivo.")
     normalized=normalize_video_url(url) if url.strip() else ""
     with mutex:
@@ -187,7 +197,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
         with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[]}
-        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title),daemon=True).start()
+        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
         raise
