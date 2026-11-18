@@ -79,7 +79,7 @@ def make_subtitles(source: Path, start: float, length: float, target: Path):
         target.write_text("\n".join(blocks),encoding="utf-8")
         return " ".join(transcript)[:650],len(blocks)
     except Exception as exc:
-        print("subtitle_generation_error:",type(exc).__name__,flush=True)
+        print("subtitle_generation_error:",type(exc).__name__,str(exc)[:160],flush=True)
         return "",0
     finally:
         try:wav.unlink(missing_ok=True)
