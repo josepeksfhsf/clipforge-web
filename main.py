@@ -4,6 +4,7 @@ from urllib.parse import urlparse, parse_qs
 from fastapi import FastAPI, Form, File, UploadFile, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from smart_engine import choose_clips, fetch_trends, REGIONS
 
 BASE=Path(__file__).parent
 ROOT=Path(tempfile.gettempdir())/"clipforge_web"
@@ -102,7 +103,7 @@ def download_video(url,folder):
     if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera 140 MB.")
     return result
 
-def render(j,url,uploaded,length,count,title,manual_start):
+def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
     work=Path(jobs[j]["folder"])
     try:
         with slot:
@@ -115,7 +116,26 @@ def render(j,url,uploaded,length,count,title,manual_start):
             duration=float(data.get("format",{}).get("duration",0))
             if not math.isfinite(duration) or duration<2 or duration>900:
                 raise ValueError("El video debe durar entre 2 segundos y 15 minutos.")
-            if manual_start >= 0:
+            smart_data=None
+            if smart_mode and manual_start < 0:
+                set_status(j,progress=26,message="Analizando audio, escenas, voz y tendencias actuales...")
+                try:
+                    picks,trends=choose_clips(source,duration,length,count,region,allow_speech=True)
+                    smart_data={"region":trends["region"],"trend_source":trends["source"],
+                                "trends_available":trends["available"],"speech_analyzed":any(p["speech_analyzed"] for p in picks),
+                                "disclaimer":"Índice experimental 1-100. NO es probabilidad porcentual de viralidad."}
+                    starts=[p["start"] for p in picks]
+                    actual=min(length,duration-0.1)
+                    count=len(starts)
+                    set_status(j,analysis=smart_data,progress=30,message="Momentos seleccionados; generando Shorts...")
+                except Exception:
+                    # If signal analysis fails, fall back to normal cutting without a fake AI score.
+                    smart_data={"unavailable":True,"disclaimer":"Análisis inteligente no disponible; cortes automáticos."}
+                    set_status(j,analysis=smart_data)
+                    smart_mode=False
+            if smart_mode and manual_start < 0 and starts:
+                pass
+            elif manual_start >= 0:
                 if manual_start >= duration-2:
                     raise ValueError("El segundo de inicio debe dejar al menos 2 segundos de video.")
                 actual=min(length,duration-manual_start-0.1)
@@ -137,7 +157,12 @@ def render(j,url,uploaded,length,count,title,manual_start):
                     (work/"caption.txt").write_text(title[:80],encoding="utf-8")
                     vf+=",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile="+str(work/"caption.txt")+":fontcolor=white:fontsize=27:box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y=h*0.82"
                 command(["ffmpeg","-nostdin","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",str(source),"-t",str(clip_duration),"-map","0:v:0","-map","0:a:0?","-vf",vf,"-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1","-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)],230)
-                clips.append({"name":f"Short {i+1}","start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}"})
+                result={"name":f"Short {i+1}","start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}"}
+                if smart_mode and smart_data and not smart_data.get("unavailable") and i<len(picks):
+                    result.update({"score":picks[i]["score"],"reasons":picks[i]["reasons"],
+                                   "matched_trends":picks[i]["matched_trends"],"transcript":picks[i]["transcript"],
+                                   "speech_analyzed":picks[i]["speech_analyzed"]})
+                clips.append(result)
             set_status(j,status="done",progress=100,message="¡Clips listos!",clips=clips)
     except Exception as e:
         msg=str(e)
@@ -163,16 +188,24 @@ def render(j,url,uploaded,length,count,title,manual_start):
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web"}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True}
+
+@app.get("/api/trends")
+def trends(region:str="CL"):
+    if region not in REGIONS:
+        raise HTTPException(400,"Región no admitida.")
+    return fetch_trends(region)
 
 @app.post("/api/jobs",status_code=202)
 async def create(url:str=Form(""),file:UploadFile|None=File(None),
                  length:int=Form(30),count:int=Form(2),title:str=Form(""),
-                 start:float=Form(-1),rights:bool=Form(False)):
+                 start:float=Form(-1),smart:bool=Form(False),region:str=Form("CL"),
+                 rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or count not in (1,2,3):raise HTTPException(400,"Parámetros incorrectos.")
     if not math.isfinite(start) or start < -1 or start > 900:
         raise HTTPException(400,"El segundo de inicio no es válido.")
+    if region not in REGIONS: raise HTTPException(400,"Región no válida.")
     if bool(url.strip())==bool(file and file.filename):raise HTTPException(400,"Elige un enlace o un archivo.")
     normalized=normalize_video_url(url) if url.strip() else ""
     with mutex:
@@ -199,8 +232,8 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     if size>MAX_BYTES:raise HTTPException(413,"Máximo 140 MB.")
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
-        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[]}
-        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start),daemon=True).start()
+        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None}
+        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
         raise
@@ -211,7 +244,7 @@ def status(j:str):
     with mutex:
         if j not in jobs:raise HTTPException(404,"Trabajo no encontrado.")
         d=jobs[j]
-        return {k:d[k] for k in ("status","progress","message","clips")}
+        return {k:d[k] for k in ("status","progress","message","clips","analysis")}
 
 @app.get("/api/jobs/{j}/clips/{number}")
 def clip(j:str,number:int):
