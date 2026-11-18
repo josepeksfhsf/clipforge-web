@@ -1,10 +1,11 @@
 import json, math, os, re, shutil, subprocess, tempfile, threading, time, uuid
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
-from fastapi import FastAPI, Form, File, UploadFile, HTTPException
+from fastapi import FastAPI, Form, File, UploadFile, HTTPException, Body
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from smart_engine import choose_clips, fetch_trends, REGIONS
+from social_studio import create_social_copy, PLATFORMS, STYLES
 
 BASE=Path(__file__).parent
 ROOT=Path(tempfile.gettempdir())/"clipforge_web"
@@ -232,7 +233,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     if size>MAX_BYTES:raise HTTPException(413,"Máximo 140 MB.")
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
-        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None}
+        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],"copy_cache":{}}
         threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
@@ -245,6 +246,51 @@ def status(j:str):
         if j not in jobs:raise HTTPException(404,"Trabajo no encontrado.")
         d=jobs[j]
         return {k:d[k] for k in ("status","progress","message","clips","analysis")}
+
+
+@app.get("/api/social/integrations")
+def social_integrations():
+    """Public capability description only; never exposes user account/token data."""
+    return {
+        "publishing_available": False,
+        "note": "Los borradores están listos. La publicación automática desde esta web requiere autorización OAuth o una API aprobada; conectar Metricool a ChatGPT no autoriza al servidor ClipForge.",
+        "metricool_connections_url": "https://app.metricool.com/brands/connections",
+        "networks": [{"id": slug, "label": data["label"], "upload_url": data["url"], "state": "no_vinculada_a_clipforge"}
+                     for slug, data in PLATFORMS.items()]
+    }
+
+@app.post("/api/jobs/{j}/copy")
+def social_copy(j: str, params: dict = Body(...)):
+    try:
+        n = int(params.get("number", 1))
+        platform = str(params.get("platform", "youtube"))
+        style = str(params.get("style", "intriga"))
+        hint = str(params.get("topic", ""))[:120].strip()
+    except (ValueError, TypeError):
+        raise HTTPException(400, "Datos para el texto inválidos.")
+    if platform not in PLATFORMS or style not in STYLES or len(hint) > 100:
+        raise HTTPException(400, "Selecciona una red social, un estilo y un tema válidos.")
+    with mutex:
+        if j not in jobs or jobs[j]["status"] != "done":
+            raise HTTPException(404, "Primero genera un Short; este trabajo ya no está disponible.")
+        job = jobs[j]
+        if not 1 <= n <= len(job["clips"]):
+            raise HTTPException(404, "Ese clip no está disponible.")
+        clip = dict(job["clips"][n - 1])
+        key = (n, platform, style, hint)
+        cached = job["copy_cache"].get(key)
+        job_hint = job.get("topic_hint", "")
+    if cached:
+        return cached
+    try:
+        result = create_social_copy(clip, platform, style, hint or job_hint)
+    except Exception:
+        raise HTTPException(503, "No fue posible generar el texto. Vuelve a intentarlo.")
+    # Cache per job so repeated requests don't repeat an optional model call.
+    with mutex:
+        if j in jobs and len(jobs[j]["copy_cache"]) < 30:
+            jobs[j]["copy_cache"][key] = result
+    return result
 
 @app.get("/api/jobs/{j}/clips/{number}")
 def clip(j:str,number:int):
