@@ -119,22 +119,25 @@ def render(j,url,uploaded,length,count,title,manual_start):
                 if manual_start >= duration-2:
                     raise ValueError("El segundo de inicio debe dejar al menos 2 segundos de video.")
                 actual=min(length,duration-manual_start-0.1)
-                count=min(count,max(1,int((duration-manual_start)//actual)))
-                starts=[round(manual_start+i*actual,2) for i in range(count)]
+                count=min(count,max(1,int(math.ceil((duration-manual_start-2)/length))))
+                starts=[round(manual_start+i*length,2) for i in range(count)]
             else:
                 actual=min(length,duration-0.1)
                 count=min(count,max(1,int(duration//actual)))
                 starts=[max(0,round((i+0.5)*duration/count-actual/2,2)) for i in range(count)]
             clips=[]
             for i,start in enumerate(starts):
+                clip_duration=round(min(actual,duration-start-0.1),2)
+                if clip_duration < 2:
+                    break
                 set_status(j,progress=30+int(i/count*60),message=f"Creando clip {i+1} de {count}...")
                 out=work/f"short_{i+1}.mp4"
                 vf="scale=540:960:force_original_aspect_ratio=increase,crop=540:960,setsar=1,format=yuv420p"
                 if title.strip():
                     (work/"caption.txt").write_text(title[:80],encoding="utf-8")
                     vf+=",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile="+str(work/"caption.txt")+":fontcolor=white:fontsize=27:box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y=h*0.82"
-                command(["ffmpeg","-nostdin","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",str(source),"-t",str(actual),"-map","0:v:0","-map","0:a:0?","-vf",vf,"-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1","-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)],230)
-                clips.append({"name":f"Short {i+1}","start":start,"length":round(actual,1),"url":f"/api/jobs/{j}/clips/{i+1}"})
+                command(["ffmpeg","-nostdin","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",str(source),"-t",str(clip_duration),"-map","0:v:0","-map","0:a:0?","-vf",vf,"-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1","-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)],230)
+                clips.append({"name":f"Short {i+1}","start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}"})
             set_status(j,status="done",progress=100,message="¡Clips listos!",clips=clips)
     except Exception as e:
         msg=str(e)
