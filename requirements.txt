@@ -3,3 +3,5 @@ uvicorn>=0.30,<1
 python-multipart>=0.0.9,<1
 yt-dlp[default]>=2026.10.26
 yt-dlp-ejs>=0.3.0
+
+faster-whisper>=1.2,<2
