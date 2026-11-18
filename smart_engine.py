@@ -255,9 +255,18 @@ def choose_clips(path, duration, requested_length, count, region="CL", allow_spe
         if len(shortlist)>=min(18,target+5):
             break
     if allow_speech:
-        for c in shortlist:
+        # On a 1-CPU Render instance, transcribing every one of 12-18 candidates
+        # can make a job appear stuck. Analyze at most four representative excerpts.
+        # Audio/scene scoring still considers all candidates.
+        speech_budget=min(4,max(1,math.ceil(target/3)))
+        spoken_pool=sorted(shortlist,key=lambda c:c["start"])
+        if len(spoken_pool)>speech_budget:
+            picks=[round(i*(len(spoken_pool)-1)/max(1,speech_budget-1))
+                   for i in range(speech_budget)]
+            spoken_pool=[spoken_pool[i] for i in sorted(set(picks))]
+        for c in spoken_pool:
             try:
-                transcript=transcribe_excerpt(path,c["start"],min(18,length))
+                transcript=transcribe_excerpt(path,c["start"],min(12,length))
                 c["text"]=transcript
                 c["ai"]=bool(transcript.strip())
                 c["hook"],c["speech"],c["match"]=text_score(transcript,trends["items"])
