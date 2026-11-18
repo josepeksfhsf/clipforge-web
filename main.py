@@ -90,9 +90,12 @@ def normalize_video_url(raw):
 def set_status(j,**kw):
     with mutex:jobs[j].update(kw)
 
-def download_video(url,folder):
+def download_video(url,folder,output_quality="720"):
     import yt_dlp
-    opts={"outtmpl":str(folder/"source.%(ext)s"),"format":"b[height<=720]/bv*[height<=720]+ba/b",
+    max_height=1080 if output_quality=="1080" else 720
+    # Prefer best separated video+audio in chosen maximum quality; progressive as fallback.
+    selected_format=f"bv*[height<={max_height}]+ba/b[height<={max_height}]/b"
+    opts={"outtmpl":str(folder/"source.%(ext)s"),"format":selected_format,
           "merge_output_format":"mp4","noplaylist":True,"quiet":True,"no_warnings":True,
           "socket_timeout":20,"retries":1,"max_filesize":MAX_BYTES,
           "js_runtimes":{"node":{"path":"/usr/local/bin/node"}}}
@@ -107,12 +110,12 @@ def download_video(url,folder):
     if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera el límite de 500 MB.")
     return result
 
-def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subtitles=False,robot_voice=False,voice_text=""):
+def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,output_quality="720",subtitles=False,robot_voice=False,voice_text=""):
     work=Path(jobs[j]["folder"])
     try:
         with slot:
             set_status(j,status="working",progress=10,message="Comprobando acceso al video...")
-            source=Path(uploaded) if uploaded else download_video(url,work)
+            source=Path(uploaded) if uploaded else download_video(url,work,output_quality)
             set_status(j,progress=25,message="Analizando duración...")
             data=json.loads(command(["ffprobe","-v","error","-show_format","-show_streams","-of","json",str(source)],30))
             if not any(x.get("codec_type")=="video" for x in data.get("streams",[])):
@@ -151,6 +154,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                 actual=min(length,duration-0.1)
                 count=min(count,max(1,int(duration//actual)))
                 starts=[max(0,round((i+0.5)*duration/count-actual/2,2)) for i in range(count)]
+            output_width,output_height=(1080,1920) if output_quality=="1080" else (720,1280)
             clips=[]
             for i,start in enumerate(starts):
                 clip_duration=round(min(actual,duration-start-0.1),2)
@@ -158,7 +162,8 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                     break
                 set_status(j,progress=30+int(i/count*60),message=f"Creando clip {i+1} de {count}...")
                 out=work/f"short_{i+1}.mp4"
-                vf="scale=540:960:force_original_aspect_ratio=increase,crop=540:960,setsar=1,format=yuv420p"
+                vf=(f"scale={output_width}:{output_height}:force_original_aspect_ratio=increase,"
+                    f"crop={output_width}:{output_height},setsar=1,format=yuv420p")
                 subtitle_text=""
                 captions_count=0
                 if subtitles:
@@ -168,7 +173,9 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                 if title.strip():
                     (work/"caption.txt").write_text(title[:80],encoding="utf-8")
                     title_y="h*0.10" if captions_count else "h*0.82"
-                    vf+=",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile="+str(work/"caption.txt")+":fontcolor=white:fontsize=27:box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y="+title_y
+                    fontsize=46 if output_quality=="1080" else 32
+                    border=17 if output_quality=="1080" else 12
+                    vf+=",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile="+str(work/"caption.txt")+f":fontcolor=white:fontsize={fontsize}:box=1:boxcolor=black@0.65:boxborderw={border}:x=(w-text_w)/2:y="+title_y
                 if captions_count:
                     vf+=","+subtitle_filter(srt)
                 audio_path=None
@@ -181,7 +188,8 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                 if audio_path:
                     cmd.extend(["-i",str(audio_path)])
                 cmd.extend(["-t",str(clip_duration),"-map","0:v:0","-vf",vf,
-                            "-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1"])
+                            "-c:v","libx264","-preset","veryfast","-crf",
+                            "23" if output_quality=="1080" else "24","-threads","1"])
                 if audio_path and has_audio:
                     cmd.extend(["-filter_complex",
                                 "[0:a:0]volume=0.55[bg];[bg][1:a:0]amix=inputs=2:duration=first:dropout_transition=0:weights=1 2:normalize=1[mix]",
@@ -192,7 +200,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                     cmd.extend(["-map","0:a:0?"])
                 cmd.extend(["-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)])
                 command(cmd,230)
-                result={"name":f"Short {i+1}","ordinal":i+1,"start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}",
+                result={"name":f"Short {i+1}","ordinal":i+1,"start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}","quality":output_quality+"p","width":output_width,"height":output_height,
                         "subtitles_added":bool(captions_count),"subtitle_blocks":captions_count,
                         "robot_voice_added":bool(audio_path)}
                 if subtitle_text:
@@ -227,7 +235,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True,"output_qualities":["720p","1080p"],"default_quality":"720p"}
 
 @app.get("/api/trends")
 def trends(region:str="CL"):
@@ -237,12 +245,13 @@ def trends(region:str="CL"):
 
 @app.post("/api/jobs",status_code=202)
 async def create(url:str=Form(""),file:UploadFile|None=File(None),
-                 length:int=Form(30),count:int=Form(2),title:str=Form(""),
+                 length:int=Form(30),count:int=Form(2),title:str=Form(""),output_quality:str=Form("720"),
                  start:float=Form(-1),smart:bool=Form(False),region:str=Form("CL"),
                  subtitles:bool=Form(False),robot_voice:bool=Form(False),voice_text:str=Form(""),
                  rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or not 1 <= count <= 12:raise HTTPException(400,"Elige entre 1 y 12 clips de 15, 30, 45 o 60 segundos.")
+    if output_quality not in ("720","1080"):raise HTTPException(400,"Calidad inválida. Elige 720p o 1080p.")
     if not math.isfinite(start) or start < -1 or start > MAX_DURATION_SECONDS:
         raise HTTPException(400,"El segundo de inicio no es válido.")
     if region not in REGIONS: raise HTTPException(400,"Región no válida.")
@@ -273,8 +282,8 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     if size>MAX_BYTES:raise HTTPException(413,"El archivo supera los 500 MB. Usa un archivo más comprimido.")
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
-        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],"copy_cache":{}}
-        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region,subtitles,robot_voice,voice_text),daemon=True).start()
+        with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],"copy_cache":{},"output_quality":output_quality}
+        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region,output_quality,subtitles,robot_voice,voice_text),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
         raise
