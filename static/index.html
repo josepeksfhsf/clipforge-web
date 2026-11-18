@@ -14,9 +14,9 @@ h2{font-size:20px;margin:0 0 9px}.muted{color:#9ca8c8;line-height:1.6;font-size:
 .tabs{background:#0c1427;padding:5px;display:flex;border-radius:12px;margin:24px 0 20px}
 .tab{flex:1;background:none;color:#aab3c9;border:0;border-radius:9px;font-size:14px;padding:12px;cursor:pointer;font-weight:700}
 .tab.on{background:#353559;color:white}label{display:block;font-size:14px;font-weight:700;margin:16px 0 8px}
-input[type=url],input[type=text],select{width:100%;padding:14px;border-radius:11px;border:1px solid #43506d;background:#0c1427;color:white;font:inherit;outline:none}
+input[type=text],select{width:100%;padding:14px;border-radius:11px;border:1px solid #43506d;background:#0c1427;color:white;font:inherit;outline:none}
 input:focus,select:focus{border-color:#a480ff}.note{font-size:12px;color:#95a1c2;margin:8px 0}
-.file{padding:32px 15px;border:2px dashed #4a567a;text-align:center;border-radius:13px;cursor:pointer;color:#aebcdd;background:#10182b}
+.paste-btn{margin-top:10px;padding:10px 15px;background:#262f4c;color:#e9e3ff;border:1px solid #5d5a90;border-radius:10px;font:inherit;font-size:13px;font-weight:750;cursor:pointer}.paste-btn:hover{background:#373c66}.source-list{color:#b9a7fd;font-size:12px;margin-top:10px}.file{padding:32px 15px;border:2px dashed #4a567a;text-align:center;border-radius:13px;cursor:pointer;color:#aebcdd;background:#10182b}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:14px}.check{display:flex;align-items:start;gap:11px;margin:20px 0;font-size:13px;font-weight:400;color:#b8c3d9;line-height:1.5}.check input{width:18px;height:18px;accent-color:#946aff}
 button.primary{width:100%;border:0;background:linear-gradient(105deg,#8057eb,#ac5eee);border-radius:13px;padding:17px;color:white;font-size:15px;font-weight:800;cursor:pointer}
 button.primary:disabled{opacity:.55;cursor:wait}.feature{display:flex;gap:14px;margin-top:25px}.icon{font-size:22px;background:#8251e52b;border-radius:12px;display:grid;place-items:center;width:44px;height:44px;flex-shrink:0}.feature strong{font-size:14px}.feature p{font-size:13px;color:#a8b2cd;line-height:1.5;margin:6px 0}.warning{margin-top:24px;border-left:3px solid #58d5b1;background:#204e432e;padding:14px;color:#b5c8d3;font-size:13px;line-height:1.6}
@@ -26,10 +26,14 @@ button.primary:disabled{opacity:.55;cursor:wait}.feature{display:flex;gap:14px;m
 footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max-width:740px){.layout{grid-template-columns:1fr}.hero{margin:42px auto 26px}.panel{padding:20px}.two{grid-template-columns:1fr}}
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
-<div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace autorizado de YouTube o sube un video. Genera clips verticales en MP4 directamente desde el navegador, sin instalar FFmpeg.</p></div>
+<div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 directamente desde el navegador, sin instalar FFmpeg.</p></div>
 <div class="layout"><main class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 15 minutos por video · 3 clips por trabajo · formato 9:16</p>
-<form id="form"><div class="tabs"><button type="button" class="tab on" id="tab-url">🔗 Enlace de YouTube</button><button type="button" class="tab" id="tab-file">⬆ Subir video</button></div>
-<div id="url-area"><label for="url">Enlace de YouTube</label><input type="url" id="url" placeholder="https://www.youtube.com/watch?v=..."><div class="note">Solo videos propios o autorizados. YouTube puede bloquear algunos enlaces.</div></div>
+<form id="form"><div class="tabs"><button type="button" class="tab on" id="tab-url">🔗 Pegar enlace</button><button type="button" class="tab" id="tab-file">⬆ Subir video</button></div>
+<div id="url-area"><label for="url">Pega el enlace de un video</label>
+<input type="text" inputmode="url" autocomplete="off" spellcheck="false" id="url" placeholder="Pega aquí el enlace (Shorts, Reels, TikTok...)">
+<button class="paste-btn" id="paste-url" type="button">📋 Pegar desde el portapapeles</button>
+<div class="source-list">YouTube · Shorts · youtu.be · TikTok · Instagram Reels · Facebook · Vimeo · Twitch · X · Dailymotion</div>
+<div class="note" id="linkhint">También puedes pegar texto de WhatsApp que incluya un enlace. Solo se admiten videos públicos sin iniciar sesión; ciertas plataformas bloquean las descargas del servidor.</div></div>
 <div id="file-area" class="hidden"><label for="file">Selecciona un video</label><label for="file" class="file" id="filename">⬆ Haz clic para subir un MP4, MOV, WebM o MKV (máximo 140 MB)</label><input type="file" id="file" accept="video/*,.mkv,.mov" class="hidden"></div>
 <div class="two"><div><label for="length">Duración</label><select id="length"><option value="15">15 segundos</option><option value="30" selected>30 segundos</option><option value="45">45 segundos</option><option value="60">60 segundos</option></select></div>
 <div><label for="count">Cantidad</label><select id="count"><option value="1">1 clip</option><option value="2" selected>2 clips</option><option value="3">3 clips</option></select></div></div>
@@ -39,18 +43,43 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <div id="results" class="results hidden"><h2>Tu resultado</h2><div class="progress"><div class="bar" id="bar"></div></div><div id="status" aria-live="polite"></div><div class="cards" id="cards"></div></div>
 </main>
 <aside class="panel"><h2>¿Cómo funciona?</h2><p class="muted">Sin programas adicionales en tu computador.</p>
-<div class="feature"><div class="icon">🎬</div><div><strong>1. Elige tu video</strong><p>Sube tu archivo o pega un enlace autorizado.</p></div></div>
+<div class="feature"><div class="icon">🎬</div><div><strong>1. Elige tu video</strong><p>Sube tu archivo o pega un enlace público de las plataformas indicadas.</p></div></div>
 <div class="feature"><div class="icon">📱</div><div><strong>2. Generamos Shorts</strong><p>El servidor crea fragmentos verticales 540 × 960.</p></div></div>
 <div class="feature"><div class="icon">⬇</div><div><strong>3. Descarga MP4</strong><p>Sin marca de agua. Revisa y edita el resultado antes de publicar.</p></div></div>
-<div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales. Los fragmentos se eligen por intervalos, no por IA semántica, y no incluyen subtítulos automáticos. El enlace de YouTube puede fallar por restricciones de YouTube.</div></aside></div>
+<div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales. Los fragmentos se eligen por intervalos, no por IA semántica, y no incluyen subtítulos automáticos. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
 <footer>ClipForge Web · Usa únicamente contenido propio o autorizado. La monetización depende de las políticas de YouTube.</footer>
 </div><script>
 const $=id=>document.getElementById(id);let mode="url",interval;
+function cleanPastedLink(value){
+  const text=(value||"").trim();
+  const found=text.match(/https?:\/\/[^\s<>"']+|(?:www\.|youtube\.com\/|youtu\.be\/|tiktok\.com\/|instagram\.com\/|facebook\.com\/|vimeo\.com\/)[^\s<>"']+/i);
+  return found ? found[0].replace(/[),.;\]}]+$/g,"") : text;
+}
+function insertLink(text){
+  $("url").value=cleanPastedLink(text);
+  $("url").focus();
+  $("linkhint").textContent="Enlace pegado. El servidor comprobará si la plataforma permite acceder al video.";
+}
+$("url").addEventListener("paste",event=>{
+ const text=event.clipboardData?.getData("text");
+ if(text){event.preventDefault();insertLink(text);}
+});
+$("paste-url").addEventListener("click",async()=>{
+ try {
+  if(!navigator.clipboard?.readText)throw Error("Portapapeles no disponible");
+  const text=await navigator.clipboard.readText();
+  if(!text)throw Error("Portapapeles vacío");
+  insertLink(text);
+ }catch(e){
+  $("url").focus();
+  $("linkhint").textContent="Tu navegador no autorizó leer el portapapeles. Usa Ctrl+V dentro del campo.";
+ }
+});
 function switchMode(m){mode=m;$("tab-url").classList.toggle("on",m==="url");$("tab-file").classList.toggle("on",m==="file");$("url-area").classList.toggle("hidden",m!=="url");$("file-area").classList.toggle("hidden",m!=="file")}
 $("tab-url").onclick=()=>switchMode("url");$("tab-file").onclick=()=>switchMode("file");
 $("file").onchange=()=>{$("filename").textContent=$("file").files[0]?.name||"Seleccionar archivo"};
 function setStatus(m,p){$("results").classList.remove("hidden");$("status").textContent=m;$("bar").style.width=(p||0)+"%"}
 async function poll(id){try{const res=await fetch("/api/jobs/"+encodeURIComponent(id),{cache:"no-store"});const data=await res.json();if(!res.ok)throw Error(data.detail||"No se pudo consultar");setStatus(data.message,data.progress);if(data.status==="done"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="✦ Generar más Shorts";$("cards").replaceChildren();for(const c of data.clips){let e=document.createElement("div");e.className="clip";let v=document.createElement("video");v.controls=true;v.preload="none";v.src=c.url;let info=document.createElement("div");info.className="clipinfo";let b=document.createElement("b");b.textContent=c.name;let t=document.createElement("div");t.textContent="Desde "+c.start+" s · "+c.length+" s";let a=document.createElement("a");a.href=c.url;a.className="download";a.download="ClipForge_"+c.name.replaceAll(" ","_")+".mp4";a.textContent="⬇ Descargar MP4";info.append(b,t,a);e.append(v,info);$("cards").append(e)}}if(data.status==="error"){clearInterval(interval);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}}catch(e){clearInterval(interval);setStatus(e.message,0);$("submit").disabled=false}}
-$("form").onsubmit=async e=>{e.preventDefault();clearInterval(interval);if(mode==="url"&&!$("url").value.trim()){setStatus("Pega un enlace de YouTube.",0);return}if(mode==="file"&&!$("file").files.length){setStatus("Selecciona un video.",0);return}if(!$("rights").checked){setStatus("Confirma los derechos del video.",0);return}
-$("submit").disabled=true;$("submit").textContent="Procesando...";$("cards").replaceChildren();setStatus("Enviando al servidor...",5);const body=new FormData();body.append("url",mode==="url"?$("url").value.trim():"");if(mode==="file")body.append("file",$("file").files[0]);body.append("length",$("length").value);body.append("count",$("count").value);body.append("title",$("title").value);body.append("rights","true");try{const response=await fetch("/api/jobs",{method:"POST",body});const data=await response.json();if(!response.ok)throw Error(data.detail||"No se pudo comenzar.");await poll(data.id);if($("submit").disabled)interval=setInterval(()=>poll(data.id),2500)}catch(e){setStatus(e.message,0);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}};
+$("form").onsubmit=async e=>{e.preventDefault();clearInterval(interval);if(mode==="url"&&!$("url").value.trim()){setStatus("Pega un enlace a un video público.",0);return}if(mode==="file"&&!$("file").files.length){setStatus("Selecciona un video.",0);return}if(!$("rights").checked){setStatus("Confirma los derechos del video.",0);return}
+$("submit").disabled=true;$("submit").textContent="Procesando...";$("cards").replaceChildren();setStatus("Comprobando el enlace y enviando al servidor...",5);const body=new FormData();body.append("url",mode==="url"?cleanPastedLink($("url").value):"");if(mode==="file")body.append("file",$("file").files[0]);body.append("length",$("length").value);body.append("count",$("count").value);body.append("title",$("title").value);body.append("rights","true");try{const response=await fetch("/api/jobs",{method:"POST",body});const data=await response.json();if(!response.ok)throw Error(data.detail||"No se pudo comenzar.");await poll(data.id);if($("submit").disabled)interval=setInterval(()=>poll(data.id),2500)}catch(e){setStatus(e.message,0);$("submit").disabled=false;$("submit").textContent="↻ Intentar de nuevo"}};
 </script></body></html>
