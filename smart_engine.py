@@ -144,31 +144,65 @@ def transcribe_excerpt(path, start, seconds=22):
             text=" ".join(s.text.strip() for s in segments)
             return text[:650]
 
+
+def sample_audio_excerpt(path, start, seconds=5):
+    """Quick audio sampling at a seek point; avoids decoding entire hour-long sources."""
+    try:
+        p=_run(["ffmpeg","-nostdin","-hide_banner","-loglevel","error",
+                "-ss",str(round(start,2)),"-i",str(path),"-t",str(seconds),
+                "-vn","-ac","1","-ar","2000","-f","s16le","pipe:1"],timeout=18)
+        pcm=array.array("h")
+        pcm.frombytes(p.stdout[:(len(p.stdout)//2)*2])
+        if not pcm:return 0.30,0.20
+        blocks=[]
+        for i in range(0,len(pcm),500):
+            a=pcm[i:i+500]
+            if a:
+                blocks.append(math.sqrt(sum(int(x)*int(x) for x in a)/len(a)))
+        if not blocks:return 0.30,0.20
+        energy=min(1.,math.log1p(statistics.fmean(blocks))/9.2)
+        variation=min(1.,(max(blocks)-min(blocks))/max(1.,max(blocks)))
+        return energy,variation
+    except Exception:
+        return 0.30,0.20
+
 def choose_clips(path, duration, requested_length, count, region="CL", allow_speech=True):
     """Return ranked nonoverlapping clip suggestions with transparent evidence."""
     duration=float(duration)
     length=min(float(requested_length),duration-0.15)
     trends=fetch_trends(region)
-    audio=audio_profile(path,duration)
-    scenes=scene_profile(path,duration)
-    step=max(3.,min(12.,length/3.))
-    max_start=max(0.,duration-length)
-    starts=[0.] if max_start<step else [round(float(x)*step,2) for x in range(int(max_start/step)+1)]
-    if max_start>0 and (not starts or max_start-starts[-1]>1):starts.append(round(max_start,2))
-    starts=starts[:110]
+    long_source=duration>900
+    if long_source:
+        # 24 seek-based excerpts distributed across the *whole* video.
+        # Full-file scene/audio decoding can exceed free-tier CPU limits.
+        audio=[]
+        scenes=[]
+        last=max(0.,duration-length)
+        starts=[round(last*i/23,2) for i in range(24)]
+    else:
+        audio=audio_profile(path,duration)
+        scenes=scene_profile(path,duration)
+        step=max(3.,min(12.,length/3.))
+        max_start=max(0.,duration-length)
+        starts=[0.] if max_start<step else [round(float(x)*step,2) for x in range(int(max_start/step)+1)]
+        if max_start>0 and (not starts or max_start-starts[-1]>1):starts.append(round(max_start,2))
+        starts=starts[:110]
     candidates=[]
     for st in starts:
-        energy,variety,motion,cuts=_basic_features(st,length,audio,scenes)
-        # Provisional score, before transcription.
+        if long_source:
+            energy,variety=sample_audio_excerpt(path,st,4)
+            motion,cuts=0.,0
+        else:
+            energy,variety,motion,cuts=_basic_features(st,length,audio,scenes)
         base=30+22*energy+10*variety+16*motion+5*(length<=45)
         candidates.append({"start":st,"energy":energy,"variety":variety,"motion":motion,"cuts":cuts,"base":base,"text":"","match":[],"hook":0,"speech":0,"ai":False})
     candidates.sort(key=lambda x:x["base"],reverse=True)
     shortlist=[]
     for c in candidates:
-        if all(abs(c["start"]-p["start"])>=length*.8 for p in shortlist):
+        if all(abs(c["start"]-p["start"])>=(max(length*.8,duration/(count*3))) for p in shortlist):
             shortlist.append(c)
         if len(shortlist)>=max(3,count):break
-    # Whisper tiny is attempted only on shortlisted excerpts, never transcribe 15-minute files.
+    # Whisper tiny is attempted only on shortlisted excerpts, never transcribes the whole source.
     if allow_speech:
         for c in shortlist:
             try:
@@ -188,13 +222,14 @@ def choose_clips(path, duration, requested_length, count, region="CL", allow_spe
         if c["energy"]>.62:reasons.append("actividad sonora")
         if c["hook"]>.1:reasons.append("frase de intriga o sorpresa")
         if c["match"]:reasons.append("coincide con búsquedas en tendencia")
+        if long_source:reasons.append("muestra analizada de un video largo")
         if not reasons:reasons.append("segmento candidato para revisión")
         c["reasons"]=reasons
     shortlist.sort(key=lambda x:x["score"],reverse=True)
     selected=shortlist[:count]
     if len(selected)<count:
         for c in candidates:
-            if all(abs(c["start"]-p["start"])>=length*.8 for p in selected):
+            if all(abs(c["start"]-p["start"])>=(max(length*.8,duration/(count*3))) for p in selected):
                 c.update(score=int(round(min(100,c["base"]))),reasons=["candidato alternativo"],ai=False,match=[],text="")
                 selected.append(c)
             if len(selected)>=count:break
