@@ -166,27 +166,67 @@ def sample_audio_excerpt(path, start, seconds=5):
     except Exception:
         return 0.30,0.20
 
+def _speech_similarity(a, b):
+    """Repeated speech detector: shared salient words and word-order shingles."""
+    a=" ".join(str(a or "").lower().split())
+    b=" ".join(str(b or "").lower().split())
+    if not a or not b:
+        return 0.0
+    left=_terms(a)
+    right=_terms(b)
+    if len(left)>=4 and len(right)>=4:
+        common=len(left & right)
+        score=common/max(1,min(len(left),len(right)))
+        if score>=0.82:
+            return score
+    aa=re.findall(r"\w+",a)
+    bb=re.findall(r"\w+",b)
+    if len(aa)<5 or len(bb)<5:
+        return 0.0
+    na={tuple(aa[i:i+4]) for i in range(len(aa)-3)}
+    nb={tuple(bb[i:i+4]) for i in range(len(bb)-3)}
+    return len(na & nb)/max(1,min(len(na),len(nb)))
+
+def _spaced(start, chosen, length):
+    """No repeated time ranges, even across user-requested 12 clips."""
+    return all(abs(start-p["start"])>=length-0.001 for p in chosen)
+
 def choose_clips(path, duration, requested_length, count, region="CL", allow_speech=True):
-    """Return ranked nonoverlapping clip suggestions with transparent evidence."""
+    """Choose non-overlapping, temporally spread-out moments with dialogue diversity.
+
+    Selection is conservative: if the source is too short, fewer unique clips are
+    returned; repeated spans are never fabricated to meet a requested count.
+    """
     duration=float(duration)
     length=min(float(requested_length),duration-0.15)
+    if length<=0:
+        return [], fetch_trends(region)
+    target=max(1,min(int(count),12,max(1,int((duration-0.1)//length))))
     trends=fetch_trends(region)
     long_source=duration>900
+    max_start=max(0.,duration-length)
+
     if long_source:
-        # 24 seek-based excerpts distributed across the *whole* video.
-        # Full-file scene/audio decoding can exceed free-tier CPU limits.
+        # Seek-based observations across the WHOLE source, not only the start.
+        # CPU effort scales to the number of requested different clips.
         audio=[]
         scenes=[]
-        last=max(0.,duration-length)
-        starts=[round(last*i/23,2) for i in range(24)]
+        samples=min(84,max(24,target*6))
+        starts=[round(max_start*i/(samples-1),2) for i in range(samples)]
     else:
         audio=audio_profile(path,duration)
         scenes=scene_profile(path,duration)
-        step=max(3.,min(12.,length/3.))
-        max_start=max(0.,duration-length)
-        starts=[0.] if max_start<step else [round(float(x)*step,2) for x in range(int(max_start/step)+1)]
-        if max_start>0 and (not starts or max_start-starts[-1]>1):starts.append(round(max_start,2))
-        starts=starts[:110]
+        step=max(2.5,min(10.,length/4.))
+        total=max(1,int(max_start/step))
+        samples=min(240,total+1)
+        starts=[round(max_start*i/max(1,samples-1),2) for i in range(samples)]
+    # Include boundary-aligned and evenly spaced positions as fallbacks, so a
+    # 3-minute video can yield twelve distinct 15-second clips if possible.
+    for i in range(target):
+        starts.append(round(min(max_start,i*length),2))
+        if target>1:
+            starts.append(round(max_start*i/(target-1),2))
+    starts=sorted(set(starts))
     candidates=[]
     for st in starts:
         if long_source:
@@ -195,25 +235,36 @@ def choose_clips(path, duration, requested_length, count, region="CL", allow_spe
         else:
             energy,variety,motion,cuts=_basic_features(st,length,audio,scenes)
         base=30+22*energy+10*variety+16*motion+5*(length<=45)
-        candidates.append({"start":st,"energy":energy,"variety":variety,"motion":motion,"cuts":cuts,"base":base,"text":"","match":[],"hook":0,"speech":0,"ai":False})
-    candidates.sort(key=lambda x:x["base"],reverse=True)
+        candidates.append({"start":st,"energy":energy,"variety":variety,
+                           "motion":motion,"cuts":cuts,"base":base,"text":"",
+                           "match":[],"hook":0,"speech":0,"ai":False})
+
+    # For the high-cost speech model transcribe a bounded candidate pool.
+    # Prioritize quality while spreading clips over the whole timeline.
+    ranked=sorted(candidates,key=lambda x:x["base"],reverse=True)
     shortlist=[]
-    for c in candidates:
-        if all(abs(c["start"]-p["start"])>=(max(length*.8,duration/(count*3))) for p in shortlist):
-            shortlist.append(c)
-        if len(shortlist)>=max(3,count):break
-    # Whisper tiny is attempted only on shortlisted excerpts, never transcribes the whole source.
+    preferred_gap=max(length,duration/max(2,target*2))
+    for gap in (preferred_gap,length):
+        for c in ranked:
+            if c in shortlist:
+                continue
+            if all(abs(c["start"]-p["start"])>=gap-0.001 for p in shortlist):
+                shortlist.append(c)
+            if len(shortlist)>=min(18,target+5):
+                break
+        if len(shortlist)>=min(18,target+5):
+            break
     if allow_speech:
         for c in shortlist:
             try:
-                transcript=transcribe_excerpt(path,c["start"],min(20,length))
+                transcript=transcribe_excerpt(path,c["start"],min(18,length))
                 c["text"]=transcript
                 c["ai"]=bool(transcript.strip())
                 c["hook"],c["speech"],c["match"]=text_score(transcript,trends["items"])
             except Exception:
-                # Keep working even when speech recognition cannot run.
                 c["ai"]=False
-    for c in shortlist:
+
+    for c in candidates:
         matched=min(1.,len(c["match"])/2.)
         score=int(round(min(100,max(1,c["base"]+9*c["hook"]+6*c["speech"]+12*matched))))
         c["score"]=score
@@ -225,16 +276,53 @@ def choose_clips(path, duration, requested_length, count, region="CL", allow_spe
         if long_source:reasons.append("muestra analizada de un video largo")
         if not reasons:reasons.append("segmento candidato para revisión")
         c["reasons"]=reasons
-    shortlist.sort(key=lambda x:x["score"],reverse=True)
-    selected=shortlist[:count]
-    if len(selected)<count:
-        for c in candidates:
-            if all(abs(c["start"]-p["start"])>=(max(length*.8,duration/(count*3))) for p in selected):
-                c.update(score=int(round(min(100,c["base"]))),reasons=["candidato alternativo"],ai=False,match=[],text="")
-                selected.append(c)
-            if len(selected)>=count:break
+
+    selected=[]
+    chronological_span=max(1.,duration-length)
+    bins=min(target,6)
+    for pool in (sorted(shortlist,key=lambda x:x["score"],reverse=True),ranked):
+        while len(selected)<target:
+            acceptable=[c for c in pool if c not in selected and _spaced(c["start"],selected,length)]
+            # Reject near-duplicate dialogue, including different footage with same narration.
+            distinct=[c for c in acceptable if all(_speech_similarity(c["text"],p["text"])<0.80
+                     for p in selected)]
+            if distinct:
+                acceptable=distinct
+            if not acceptable:
+                break
+            def weight(c):
+                bucket=min(bins-1,int(c["start"]/chronological_span*bins))
+                taken=sum(min(bins-1,int(p["start"]/chronological_span*bins))==bucket
+                          for p in selected)
+                return c["score"]-12*taken
+            chosen=max(acceptable,key=lambda c:(weight(c),-c["start"]))
+            selected.append(chosen)
+        if len(selected)>=target:
+            break
+
+    if len(selected)<target:
+        # Always return feasible, non-overlapping ranges instead of duplicates.
+        # On a densely packed source, use exact slots with no overlap.
+        extra=max(0.,duration-target*length)
+        fallback=[i*(length+extra/max(1,target-1)) for i in range(target)]
+        selected=[]
+        for i,st in enumerate(fallback):
+            st=round(min(max_start,st),2)
+            closest=min(candidates,key=lambda c:abs(c["start"]-st))
+            picked=dict(closest,start=st)
+            if not _spaced(st,selected,length):
+                continue
+            picked["reasons"]=list(picked.get("reasons",[]))+["intervalo único sin solapamiento"]
+            selected.append(picked)
+
+    # Show chronological clips, not a list sorted by raw engagement heuristic.
+    selected.sort(key=lambda c:c["start"])
     out=[]
-    for c in selected:
-        out.append({"start":c["start"],"score":c["score"],"reasons":c["reasons"],"transcript":c["text"][:260],
-                    "matched_trends":c["match"],"speech_analyzed":c["ai"]})
+    for c in selected[:target]:
+        reasons=list(c["reasons"])
+        if "momentos repartidos en el video" not in reasons:
+            reasons.append("momentos repartidos en el video")
+        out.append({"start":c["start"],"score":c["score"],"reasons":reasons,
+                    "transcript":c["text"][:260],"matched_trends":c["match"],
+                    "speech_analyzed":c["ai"]})
     return out,trends
