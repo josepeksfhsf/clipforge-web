@@ -87,20 +87,22 @@ def _local_copy(platform, style, topic, transcript, matches, seconds):
     label="este video" if plain else topic
     detail=_detail(transcript)
     descriptor=f"el {detail}" if detail and not detail.startswith(("el ","la ")) else detail
+    of_detail=("del "+descriptor[3:]) if descriptor.startswith("el ") else ("de "+descriptor if descriptor else "")
+    to_detail=("al "+descriptor[3:]) if descriptor.startswith("el ") else ("a "+descriptor if descriptor else "")
     if style=="intriga":
         if detail:
-            options=[f"{topic}: ¿qué opinas de {descriptor}? 👀",
+            options=[f"{topic}: ¿qué opinas {of_detail}? 👀",
                      f"Fíjate en {descriptor} · {topic}",
                      f"¿Habías notado {descriptor}? | {topic}"]
         else:
             options=[f"{label}: ¿qué te llamó la atención? 👀",
                      f"Este clip de {label} da para debatir 🔥",
                      f"¿Qué opinas de este momento de {label}?"]
-        lead=f"👀 Un vistazo a {label}"+(f", especialmente a {descriptor}" if detail else "")+"."
+        lead=f"👀 Un vistazo a {label}"+(f", especialmente {to_detail}" if detail else "")+"."
         question="¿Qué parte te llamó la atención? Cuéntamelo en los comentarios."
     elif style=="emocion":
         options=[f"¡Hablemos de {label}! 🔥",f"{label}: ¿qué emoción te provoca? 💬",f"Un momento de {label} para compartir ✨"]
-        lead=f"✨ Un fragmento sobre {label}"+(f", con atención a {descriptor}" if detail else "")+"."
+        lead=f"✨ Un fragmento sobre {label}"+(f", con atención {to_detail}" if detail else "")+"."
         question="¿Con qué sensación te quedaste al verlo?"
     elif style=="humor":
         options=[f"{label}: ¿cuál fue tu reacción? 😂",f"Cuando aparece {label} 😅",f"Comenta este momento de {label} 💬"]
