@@ -121,7 +121,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
             duration=float(data.get("format",{}).get("duration",0))
             if not math.isfinite(duration) or duration<2 or duration>MAX_DURATION_SECONDS:
                 raise ValueError("El video debe durar entre 2 segundos y 60 minutos.")
-            count=min(count,max(1,int((duration-0.1)//min(length,duration-0.15))))
+            count=min(count,max(1,int(duration//min(length,duration-0.15))))
             smart_data=None
             if smart_mode and manual_start < 0:
                 set_status(j,progress=26,message="Analizando audio, escenas, voz y tendencias actuales...")
