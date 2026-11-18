@@ -20,21 +20,72 @@ def command(args,timeout=240):
         raise RuntimeError(p.stderr.strip()[-350:] or "Falló el procesamiento.")
     return p.stdout
 
-def valid_youtube(s):
+SUPPORTED_HOSTS = {
+    "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
+    "youtube-nocookie.com", "www.youtube-nocookie.com", "youtu.be", "www.youtu.be",
+    "tiktok.com", "www.tiktok.com", "m.tiktok.com", "vm.tiktok.com", "vt.tiktok.com",
+    "instagram.com", "www.instagram.com",
+    "facebook.com", "www.facebook.com", "m.facebook.com", "web.facebook.com",
+    "fb.watch", "www.fb.watch", "vimeo.com", "www.vimeo.com",
+    "dailymotion.com", "www.dailymotion.com", "dai.ly", "www.dai.ly",
+    "x.com", "www.x.com", "twitter.com", "www.twitter.com",
+    "twitch.tv", "www.twitch.tv", "clips.twitch.tv",
+    "streamable.com", "www.streamable.com"
+}
+YOUTUBE_HOSTS = {
+    "youtube.com", "www.youtube.com", "m.youtube.com", "music.youtube.com",
+    "youtube-nocookie.com", "www.youtube-nocookie.com", "youtu.be", "www.youtu.be"
+}
+VIDEO_ID = re.compile(r"[A-Za-z0-9_-]{11}")
+
+def normalize_video_url(raw):
+    """Allow public supported video hosts, not arbitrary URLs or private networks."""
+    raw = (raw or "").strip()
+    if len(raw) > 2500:
+        raise HTTPException(400, "El enlace es demasiado largo.")
+    if VIDEO_ID.fullmatch(raw):
+        return "https://www.youtube.com/watch?v=" + raw
+    match = re.search(
+        r"(?:https?://|www\.|youtube\.com/|youtu\.be/|tiktok\.com/|instagram\.com/|facebook\.com/|vimeo\.com/)[^\s<>\"']+",
+        raw, re.I)
+    if not match:
+        raise HTTPException(400, "Pega un enlace público de video compatible (YouTube, TikTok, Instagram, Facebook, Vimeo y otros).")
+    url = match.group(0).strip("()[]{}<>,.;\"'")
+    if not url.startswith(("https://", "http://")):
+        url = "https://" + url
     try:
-        u=urlparse(s)
-        if u.scheme!="https" or u.username or u.password or u.port:return False
-        h=(u.hostname or "").lower()
-        if h in ("youtube.com","www.youtube.com","m.youtube.com","music.youtube.com"):
-            if u.path=="/watch": return bool(re.fullmatch(r"[A-Za-z0-9_-]{11}",parse_qs(u.query).get("v",[""])[0]))
-            return bool(re.fullmatch(r"/(shorts|live)/[A-Za-z0-9_-]{11}/?",u.path))
-        return h=="youtu.be" and bool(re.fullmatch(r"/[A-Za-z0-9_-]{11}/?",u.path))
-    except Exception:return False
+        parsed = urlparse(url)
+        host = (parsed.hostname or "").lower().rstrip(".")
+        if (parsed.scheme not in ("http", "https") or
+                parsed.username is not None or parsed.password is not None or
+                parsed.port is not None or host not in SUPPORTED_HOSTS):
+            raise ValueError("host")
+    except ValueError:
+        raise HTTPException(400, "Este dominio no está admitido. Usa un enlace de video de una plataforma compatible.")
+    if not parsed.path or parsed.path == "/":
+        raise HTTPException(400, "Pega la dirección de un video concreto, no de una página principal.")
+    if host in YOUTUBE_HOSTS:
+        path = parsed.path.rstrip("/")
+        if host.endswith("youtu.be"):
+            if not VIDEO_ID.fullmatch(path.lstrip("/")):
+                raise HTTPException(400, "El enlace corto de YouTube no incluye un ID de video válido.")
+        elif path == "/watch":
+            id_value = parse_qs(parsed.query).get("v", [""])[0]
+            if not VIDEO_ID.fullmatch(id_value):
+                raise HTTPException(400, "Ese enlace de YouTube no contiene un video válido.")
+        elif path.startswith(("/shorts/", "/live/", "/embed/", "/v/")):
+            if not VIDEO_ID.fullmatch(path.split("/")[2]):
+                raise HTTPException(400, "El enlace de YouTube no contiene un ID de video válido.")
+        elif path.startswith("/clip/"):
+            pass  # Clip links may require special support from the platform
+        else:
+            raise HTTPException(400, "Pega un enlace a un video, Short o directo grabado de YouTube, no una lista ni un canal.")
+    return parsed._replace(scheme="https", netloc=host).geturl()
 
 def set_status(j,**kw):
     with mutex:jobs[j].update(kw)
 
-def download_youtube(url,folder):
+def download_video(url,folder):
     import yt_dlp
     opts={"outtmpl":str(folder/"source.%(ext)s"),"format":"b[height<=720]/bv*[height<=720]+ba/b",
           "merge_output_format":"mp4","noplaylist":True,"quiet":True,"no_warnings":True,
@@ -54,8 +105,8 @@ def render(j,url,uploaded,length,count,title):
     work=Path(jobs[j]["folder"])
     try:
         with slot:
-            set_status(j,status="working",progress=10,message="Preparando el video...")
-            source=Path(uploaded) if uploaded else download_youtube(url,work)
+            set_status(j,status="working",progress=10,message="Comprobando acceso al video...")
+            source=Path(uploaded) if uploaded else download_video(url,work)
             set_status(j,progress=25,message="Analizando duración...")
             data=json.loads(command(["ffprobe","-v","error","-show_format","-show_streams","-of","json",str(source)],30))
             if not any(x.get("codec_type")=="video" for x in data.get("streams",[])):
@@ -79,8 +130,21 @@ def render(j,url,uploaded,length,count,title):
             set_status(j,status="done",progress=100,message="¡Clips listos!",clips=clips)
     except Exception as e:
         msg=str(e)
-        if "youtube" in msg.lower() or "403" in msg or "Sign in" in msg:
-            msg="YouTube no permitió acceder a ese enlace. Prueba subiendo un video propio."
+        lower=msg.lower()
+        if "not a bot" in lower or "sign in to confirm" in lower:
+            msg="YouTube bloqueó las descargas automáticas desde este servidor. Tu enlace es válido, pero debes subir el archivo del video desde tu dispositivo."
+        elif "login" in lower or "sign in" in lower or "private" in lower:
+            msg="La plataforma exige iniciar sesión o el video es privado. Prueba con un enlace público o sube un archivo propio."
+        elif "unsupported url" in lower or "no suitable" in lower:
+            msg="La plataforma no ofrece acceso a ese tipo de enlace. Prueba con el enlace directo al video o sube el archivo."
+        elif "403" in lower or "429" in lower or "forbidden" in lower:
+            msg="La plataforma rechazó el acceso automático al video desde Render. Prueba subiendo un archivo propio."
+        elif "timed out" in lower or "timeout" in lower:
+            msg="La plataforma no respondió a tiempo. Prueba más tarde o sube un archivo propio."
+        elif "youtube" in lower and "error" in lower:
+            msg="No fue posible obtener ese video desde YouTube. Puedes subir el archivo original."
+        elif "error" in lower and "yt_dlp" in lower:
+            msg="No fue posible descargar ese enlace. Puede estar restringido por la plataforma."
         set_status(j,status="error",progress=0,message=msg[:200])
     finally:
         if uploaded:
@@ -96,7 +160,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or count not in (1,2,3):raise HTTPException(400,"Parámetros incorrectos.")
     if bool(url.strip())==bool(file and file.filename):raise HTTPException(400,"Elige un enlace o un archivo.")
-    if url.strip() and not valid_youtube(url.strip()):raise HTTPException(400,"URL de YouTube no válida.")
+    normalized=normalize_video_url(url) if url.strip() else ""
     with mutex:
         now=time.time()
         for key,val in list(jobs.items()):
@@ -122,7 +186,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
         with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[]}
-        threading.Thread(target=render,args=(j,url.strip(),str(uploaded) if uploaded else None,length,count,title),daemon=True).start()
+        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
         raise
