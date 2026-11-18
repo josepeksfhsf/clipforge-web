@@ -183,7 +183,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subt
                             "-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1"])
                 if audio_path and has_audio:
                     cmd.extend(["-filter_complex",
-                                "[0:a:0]volume=0.55[bg];[bg][1:a:0]amix=inputs=2:duration=first:dropout_transition=0:weights=1 2:normalize=0[mix]",
+                                "[0:a:0]volume=0.55[bg];[bg][1:a:0]amix=inputs=2:duration=first:dropout_transition=0:weights=1 2:normalize=1[mix]",
                                 "-map","[mix]"])
                 elif audio_path:
                     cmd.extend(["-map","1:a:0","-af","apad"])
