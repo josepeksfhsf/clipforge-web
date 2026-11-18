@@ -66,6 +66,21 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 .upload-settings .verify input{margin:3px 0 0}
 .upload-result{font-size:13px;color:#d3e4ef;line-height:1.5;padding:7px 0}
 .upload-result a{color:#8edace}
+
+.auto-yt{margin:14px 0;padding:14px;border-radius:14px;border:1px solid #568c73;background:#122e29}
+.auto-yt .check{margin:3px 0;font-size:13px}
+.auto-yt .muted{font-size:12px;margin:9px 0}
+.auto-yt select{font-size:13px}
+.auto-yt .config{margin-top:12px}
+.auto-yt label:not(.check){font-size:12px}
+.auto-yt .hidden{display:none!important}
+.auto-yt button{background:linear-gradient(100deg,#176b5f,#207b77);padding:11px 12px;color:white;border:0;border-radius:9px;font:inherit;font-size:13px;font-weight:750;cursor:pointer}
+.clip-publish{width:100%;border:1px solid #3aa88c;border-radius:9px;padding:10px 9px;margin-top:8px;background:#195d56;color:#fff;font:inherit;font-size:13px;font-weight:800;cursor:pointer}
+.batch-box{border:1px solid #3b8a75;border-radius:13px;background:#122b2d;padding:13px;margin:13px 0 3px}
+.batch-box button{background:linear-gradient(110deg,#217b63,#2ba891);color:white;border:none;border-radius:10px;padding:12px 15px;font:inherit;font-weight:750;cursor:pointer}
+.batch-box button:disabled{opacity:.55;cursor:wait}
+.batch-box p{font-size:12px;color:#b8d6cc;line-height:1.5}
+.batch-box a{color:#9cead1}
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
@@ -96,6 +111,22 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 </section>
 <p class="note">Para videos largos, la IA toma muestras de distintas partes del contenido. No necesita analizar todos los fotogramas.</p>
 <label for="title">Texto en pantalla (opcional)</label><input id="title" maxlength="80" placeholder="¡No te esperabas este final!">
+<section class="auto-yt" id="auto-youtube">
+<label class="check"><input type="checkbox" id="yt-auto-upload"><span><strong>🚀 Subir automáticamente mis Shorts a YouTube</strong>
+<span style="display:block;font-weight:400">Después de generarlos, ClipForge los enviará a YouTube con títulos y descripciones sugeridos. Debes conectar Google y autorizar la publicación antes de crear los clips.</span></span></label>
+<div class="config hidden" id="yt-auto-settings">
+  <p class="muted" id="yt-auto-connect">Verificando cuenta de YouTube...</p>
+  <a href="/api/publish/youtube/connect" id="yt-auto-login" class="conn-link hidden">Conectar mi YouTube</a>
+  <label for="yt-auto-privacy">Visibilidad en YouTube</label>
+  <select id="yt-auto-privacy"><option value="private" selected>Privado (recomendado para probar)</option><option value="unlisted">No listado</option><option value="public">Público</option></select>
+  <label for="yt-auto-kids">¿Los clips están dirigidos específicamente a niños?</label>
+  <select id="yt-auto-kids"><option value="">Selecciona...</option><option value="no">No</option><option value="yes">Sí</option></select>
+  <label for="yt-auto-synthetic">¿Incluyen contenido realista generado o alterado con IA que deba declararse?</label>
+  <select id="yt-auto-synthetic"><option value="">Selecciona...</option><option value="yes">Sí</option><option value="no">No</option></select>
+  <p class="muted">Al generar pediremos confirmación para publicar todos los clips. Mantén esta página abierta hasta que termine de generar y comience la subida.</p>
+  <button id="yt-batch-start-existing" type="button" class="hidden">▶ Subir los Shorts que ya generé</button>
+</div>
+</section>
 <label class="check"><input id="rights" type="checkbox" required><span>Confirmo que tengo autorización para utilizar, editar y publicar este material.</span></label>
 <button class="primary" id="submit" type="submit">✦ Generar Shorts gratis</button></form>
 <div id="results" class="results hidden"><h2>Tu resultado</h2><div class="progress"><div class="bar" id="bar"></div></div><div id="status" aria-live="polite"></div>
@@ -103,12 +134,15 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <p>Si el video es tuyo, descárgalo desde YouTube Studio (Contenido → menú del video → Descargar), o utiliza el archivo original. Después súbelo aquí y ClipForge generará los Shorts en MP4.</p>
 <button type="button" id="backup-upload">⬆ Subir el archivo de video</button>
 <a href="https://studio.youtube.com/" target="_blank" rel="noopener noreferrer">Abrir YouTube Studio</a></div>
-<div class="cards" id="cards"></div></div>
+<div class="cards" id="cards"></div>
+<div class="batch-box hidden" id="yt-batch-box"><button type="button" id="yt-batch-now">🚀 Publicar todos los Shorts en YouTube</button>
+<p id="yt-batch-hint">Los títulos y descripciones se generarán para cada clip. Elige la privacidad y confirma que tienes derechos para publicarlos.</p>
+<div id="yt-batch-status" aria-live="polite"></div></div></div>
 </main>
 <aside class="panel"><h2>¿Cómo funciona?</h2><p class="muted">Sin programas adicionales en tu computador.</p>
 <div class="feature"><div class="icon">🎬</div><div><strong>1. Elige tu video</strong><p>Sube tu archivo o pega un enlace público de las plataformas indicadas.</p></div></div>
 <div class="feature"><div class="icon">📱</div><div><strong>2. Generamos Shorts</strong><p>ClipForge analiza señales de interés y genera fragmentos verticales 540 × 960.</p></div></div>
-<div class="feature"><div class="icon">⬇</div><div><strong>3. Descarga MP4</strong><p>Sin marca de agua. Revisa y edita el resultado antes de publicar.</p></div></div>
+<div class="feature"><div class="icon">🚀</div><div><strong>3. Publica en YouTube</strong><p>Con Google conectado, publica los clips individualmente o configura la subida automática de todos al terminar.</p></div></div>
 <div class="warning"><strong>Gratis con límites:</strong> el alojamiento gratuito es limitado y puede suspenderse por inactividad. Los clips son temporales; las subidas y exportaciones grandes pueden agotarse en el plan gratuito. Los fragmentos se eligen por intervalos, con análisis experimental (sin garantía de viralidad), y no incluyen subtítulos automáticos. YouTube y otras redes pueden bloquear las descargas desde Render: si ocurre, sube tu archivo de video. No es posible descargar todos los enlaces ni contenido privado.</div></aside></div>
 
 <section class="panel social-section" id="social-hub">
