@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from smart_engine import choose_clips, fetch_trends, REGIONS
 from social_studio import create_social_copy, PLATFORMS, STYLES
 from youtube_publisher import install_youtube_publisher
+from media_enhance import make_subtitles, make_robot_voice, subtitle_filter
 
 BASE=Path(__file__).parent
 ROOT=Path(tempfile.gettempdir())/"clipforge_web"
@@ -106,7 +107,7 @@ def download_video(url,folder):
     if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera el límite de 500 MB.")
     return result
 
-def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
+def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,subtitles=False,robot_voice=False,voice_text=""):
     work=Path(jobs[j]["folder"])
     try:
         with slot:
@@ -116,6 +117,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
             data=json.loads(command(["ffprobe","-v","error","-show_format","-show_streams","-of","json",str(source)],30))
             if not any(x.get("codec_type")=="video" for x in data.get("streams",[])):
                 raise ValueError("El archivo no contiene video.")
+            has_audio=any(x.get("codec_type")=="audio" for x in data.get("streams",[]))
             duration=float(data.get("format",{}).get("duration",0))
             if not math.isfinite(duration) or duration<2 or duration>MAX_DURATION_SECONDS:
                 raise ValueError("El video debe durar entre 2 segundos y 60 minutos.")
@@ -156,14 +158,47 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
                 set_status(j,progress=30+int(i/count*60),message=f"Creando clip {i+1} de {count}...")
                 out=work/f"short_{i+1}.mp4"
                 vf="scale=540:960:force_original_aspect_ratio=increase,crop=540:960,setsar=1,format=yuv420p"
+                subtitle_text=""
+                captions_count=0
+                if subtitles:
+                    set_status(j,message=f"Transcribiendo subtítulos del clip {i+1} de {count}...")
+                    srt=work/f"subtitle_{i+1}.srt"
+                    subtitle_text,captions_count=make_subtitles(source,start,clip_duration,srt)
                 if title.strip():
                     (work/"caption.txt").write_text(title[:80],encoding="utf-8")
-                    vf+=",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile="+str(work/"caption.txt")+":fontcolor=white:fontsize=27:box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y=h*0.82"
-                command(["ffmpeg","-nostdin","-hide_banner","-loglevel","error","-y","-ss",str(start),"-i",str(source),"-t",str(clip_duration),"-map","0:v:0","-map","0:a:0?","-vf",vf,"-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1","-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)],230)
-                result={"name":f"Short {i+1}","start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}"}
+                    title_y="h*0.10" if captions_count else "h*0.82"
+                    vf+=",drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:textfile="+str(work/"caption.txt")+":fontcolor=white:fontsize=27:box=1:boxcolor=black@0.65:boxborderw=12:x=(w-text_w)/2:y="+title_y
+                if captions_count:
+                    vf+=","+subtitle_filter(srt)
+                audio_path=None
+                if robot_voice:
+                    audio_path=work/f"voice_{i+1}.wav"
+                    narration=voice_text or title or "Mira este momento y cuéntame qué opinas."
+                    make_robot_voice(narration,audio_path)
+                cmd=["ffmpeg","-nostdin","-hide_banner","-loglevel","error","-y",
+                     "-ss",str(start),"-i",str(source)]
+                if audio_path:
+                    cmd.extend(["-i",str(audio_path)])
+                cmd.extend(["-t",str(clip_duration),"-map","0:v:0","-vf",vf,
+                            "-c:v","libx264","-preset","ultrafast","-crf","27","-threads","1"])
+                if audio_path and has_audio:
+                    cmd.extend(["-filter_complex",
+                                "[0:a:0]volume=0.55[bg];[bg][1:a:0]amix=inputs=2:duration=first:dropout_transition=0:weights=1 2:normalize=0[mix]",
+                                "-map","[mix]"])
+                elif audio_path:
+                    cmd.extend(["-map","1:a:0","-af","apad"])
+                else:
+                    cmd.extend(["-map","0:a:0?"])
+                cmd.extend(["-c:a","aac","-b:a","96k","-movflags","+faststart",str(out)])
+                command(cmd,230)
+                result={"name":f"Short {i+1}","start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}",
+                        "subtitles_added":bool(captions_count),"subtitle_blocks":captions_count,
+                        "robot_voice_added":bool(audio_path)}
+                if subtitle_text:
+                    result["transcript"]=subtitle_text[:550]
                 if smart_mode and smart_data and not smart_data.get("unavailable") and i<len(picks):
                     result.update({"score":picks[i]["score"],"reasons":picks[i]["reasons"],
-                                   "matched_trends":picks[i]["matched_trends"],"transcript":picks[i]["transcript"],
+                                   "matched_trends":picks[i]["matched_trends"],"transcript":result.get("transcript") or picks[i]["transcript"],
                                    "speech_analyzed":picks[i]["speech_analyzed"]})
                 clips.append(result)
             set_status(j,status="done",progress=100,message="¡Clips listos!",clips=clips)
@@ -191,7 +226,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region):
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True}
 
 @app.get("/api/trends")
 def trends(region:str="CL"):
@@ -203,12 +238,14 @@ def trends(region:str="CL"):
 async def create(url:str=Form(""),file:UploadFile|None=File(None),
                  length:int=Form(30),count:int=Form(2),title:str=Form(""),
                  start:float=Form(-1),smart:bool=Form(False),region:str=Form("CL"),
+                 subtitles:bool=Form(False),robot_voice:bool=Form(False),voice_text:str=Form(""),
                  rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or count not in (1,2,3):raise HTTPException(400,"Parámetros incorrectos.")
     if not math.isfinite(start) or start < -1 or start > MAX_DURATION_SECONDS:
         raise HTTPException(400,"El segundo de inicio no es válido.")
     if region not in REGIONS: raise HTTPException(400,"Región no válida.")
+    if len(voice_text)>180: raise HTTPException(400,"La narración admite máximo 180 caracteres.")
     if bool(url.strip())==bool(file and file.filename):raise HTTPException(400,"Elige un enlace o un archivo.")
     normalized=normalize_video_url(url) if url.strip() else ""
     with mutex:
@@ -236,7 +273,7 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
                     f.write(chunk)
             if size<1024:raise HTTPException(400,"Archivo vacío.")
         with mutex:jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),"folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],"copy_cache":{}}
-        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region),daemon=True).start()
+        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region,subtitles,robot_voice,voice_text),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
         raise
