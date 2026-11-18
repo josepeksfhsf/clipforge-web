@@ -6,6 +6,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from smart_engine import choose_clips, fetch_trends, REGIONS
 from social_studio import create_social_copy, PLATFORMS, STYLES
+from youtube_publisher import install_youtube_publisher
 
 BASE=Path(__file__).parent
 ROOT=Path(tempfile.gettempdir())/"clipforge_web"
@@ -253,7 +254,7 @@ def status(j:str):
 def social_integrations():
     """Public capability description only; never exposes user account/token data."""
     return {
-        "publishing_available": False,
+        "publishing_available": "youtube_after_oauth_setup",
         "note": "Los borradores están listos. La publicación automática desde esta web requiere autorización OAuth o una API aprobada; conectar Metricool a ChatGPT no autoriza al servidor ClipForge.",
         "metricool_connections_url": "https://app.metricool.com/brands/connections",
         "networks": [{"id": slug, "label": data["label"], "upload_url": data["url"], "state": "no_vinculada_a_clipforge"}
@@ -301,5 +302,7 @@ def clip(j:str,number:int):
         path=Path(jobs[j]["folder"])/f"short_{number}.mp4"
     if not path.is_file():raise HTTPException(404,"Clip no disponible.")
     return FileResponse(path,media_type="video/mp4",filename=f"ClipForge_Short_{number}.mp4")
+
+install_youtube_publisher(app,jobs,mutex)
 
 app.mount("/",StaticFiles(directory=str(BASE/"static"),html=True),name="site")
