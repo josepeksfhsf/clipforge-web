@@ -211,7 +211,7 @@ def choose_clips(path, duration, requested_length, count, region="CL", allow_spe
         # CPU effort scales to the number of requested different clips.
         audio=[]
         scenes=[]
-        samples=min(84,max(24,target*6))
+        samples=min(60,max(24,target*4))
         starts=[round(max_start*i/(samples-1),2) for i in range(samples)]
     else:
         audio=audio_profile(path,duration)
