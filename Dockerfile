@@ -10,7 +10,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 # Cache the small CPU speech-recognition model in the image so jobs don't download it.
 RUN python -c "from faster_whisper import WhisperModel; WhisperModel('tiny', device='cpu', compute_type='int8', cpu_threads=1, download_root='/app/models')"
-COPY main.py smart_engine.py social_studio.py ./
+COPY main.py smart_engine.py social_studio.py youtube_publisher.py ./
 COPY static ./static
 ENV PORT=10000
 EXPOSE 10000
