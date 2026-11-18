@@ -89,7 +89,8 @@ def download_video(url,folder):
     import yt_dlp
     opts={"outtmpl":str(folder/"source.%(ext)s"),"format":"b[height<=720]/bv*[height<=720]+ba/b",
           "merge_output_format":"mp4","noplaylist":True,"quiet":True,"no_warnings":True,
-          "socket_timeout":20,"retries":1,"max_filesize":MAX_BYTES}
+          "socket_timeout":20,"retries":1,"max_filesize":MAX_BYTES,
+          "js_runtimes":{"node":{"path":"/usr/local/bin/node"}}}
     with yt_dlp.YoutubeDL(opts) as ydl:
         meta=ydl.extract_info(url,download=False)
         if meta.get("is_live") or float(meta.get("duration") or 0)>900:
