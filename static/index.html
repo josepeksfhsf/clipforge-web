@@ -51,6 +51,20 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 .social-drafts .fineprint{color:#91a2c8;font-size:12px;line-height:1.5}
 .social-message{font-size:13px;color:#b3cced;margin:10px 0;min-height:18px}
 @media(max-width:820px){.social-grid{grid-template-columns:1fr}.social-fields{grid-template-columns:1fr}}
+
+/* YouTube uploader: official OAuth connection and explicit upload consent. */
+.yt-connectbox{margin:14px 0;padding:15px;border:1px solid #40687c;border-radius:14px;background:#102337}
+.yt-connectbox strong{font-size:14px}
+.yt-connectbox p{font-size:12px;color:#a7c0d6;line-height:1.55}
+.yt-connectbox a{display:inline-block;padding:10px 12px;color:white;background:#b53e45;text-decoration:none;border-radius:9px;font-weight:750;font-size:13px}
+.yt-connectbox button{padding:10px 12px;border-radius:9px;border:1px solid #62748a;background:#293a50;color:white;cursor:pointer}
+.upload-settings{margin-top:19px;padding:17px;border:1px solid #4b6c5a;background:#102921;border-radius:13px}
+.upload-settings label{font-size:13px}
+.upload-settings select{width:100%;margin-top:6px;font-size:13px}
+.upload-settings .verify{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.5;color:#c4dacf}
+.upload-settings .verify input{margin:3px 0 0}
+.upload-result{font-size:13px;color:#d3e4ef;line-height:1.5;padding:7px 0}
+.upload-result a{color:#8edace}
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
@@ -102,14 +116,23 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
  <div class="social-grid">
  <section class="social-subpanel">
   <h3>🔗 Conectar mis cuentas</h3>
-  <p class="muted">Usa la autorización oficial de Metricool. Esta web nunca te pedirá contraseñas de tus redes sociales.</p>
-  <div class="connection-card"><div><strong>▶ YouTube</strong><div><span>Conectar y gestionar en Metricool</span></div></div><span>↗</span></div>
-  <div class="connection-card"><div><strong>♪ TikTok</strong><div><span>Conectar y gestionar en Metricool</span></div></div><span>↗</span></div>
-  <div class="connection-card"><div><strong>◎ Instagram</strong><div><span>Conectar y gestionar en Metricool</span></div></div><span>↗</span></div>
-  <div class="connection-card"><div><strong>f Facebook</strong><div><span>Conectar y gestionar en Metricool</span></div></div><span>↗</span></div>
-  <a class="conn-link" href="https://app.metricool.com/brands/connections" target="_blank" rel="noopener noreferrer">Administrar conexiones en Metricool ↗</a>
-  <div class="auto-state"><strong>Publicación automática desde ClipForge: no activada.</strong>
-  <div>La conexión de redes a Metricool o ChatGPT no concede acceso automático a este sitio. Para publicar directamente desde ClipForge hacen falta permisos oficiales de publicación y una integración autenticada. Nunca publicaremos en tus cuentas sin autorización.</div></div>
+  <p class="muted">La publicación directa requiere autorización oficial de cada red. ClipForge no solicita tu contraseña de Google, Facebook ni TikTok.</p>
+  <div class="yt-connectbox">
+    <strong>▶ YouTube · subida directa</strong>
+    <p id="yt-connection-message">Comprobando si la conexión oficial está habilitada...</p>
+    <a id="yt-connect-link" href="/api/publish/youtube/connect" class="hidden">Conectar YouTube con Google</a>
+    <button id="yt-disconnect" type="button" class="hidden">Desconectar YouTube</button>
+    <div id="yt-config-info" class="hidden">
+      <p>La integración ya está programada, pero necesita que el propietario configure el cliente OAuth de Google en Render. No introduzcas tus claves en esta página.</p>
+      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" style="background:#36557c">Abrir Google Cloud</a>
+    </div>
+  </div>
+  <div class="connection-card"><div><strong>♪ TikTok</strong><div><span>Permisos de publicación directa aún no configurados en ClipForge</span></div></div><span>Próximo</span></div>
+  <div class="connection-card"><div><strong>◎ Instagram</strong><div><span>Requiere cuenta profesional y permisos oficiales de Meta</span></div></div><span>Próximo</span></div>
+  <div class="connection-card"><div><strong>f Facebook</strong><div><span>Requiere permisos de publicación para tu página</span></div></div><span>Próximo</span></div>
+  <a class="conn-link" href="https://app.metricool.com/brands/connections" target="_blank" rel="noopener noreferrer">Administrar redes ya conectadas en Metricool ↗</a>
+  <div class="auto-state"><strong>Publicación directa: YouTube, tras configurar y autorizar OAuth.</strong>
+  <div>TikTok, Instagram y Facebook todavía no publican automáticamente desde ClipForge. Metricool conectado en ChatGPT no da permisos al servidor web; sus permisos y API son independientes. No se enviará ningún video sin tu confirmación.</div></div>
  </section>
  <section class="social-subpanel social-tools">
   <h3>✨ Generador de títulos y descripciones</h3>
@@ -140,6 +163,19 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
       <button type="button" id="open-social" class="social-action">↗ Abrir plataforma</button>
     </div>
     <p class="fineprint">Comprueba siempre que el texto corresponda al video. Compartir desde el móvil abre el selector del sistema y requiere tu confirmación; no publica automáticamente.</p>
+<div class="upload-settings hidden" id="youtube-publish-panel">
+  <h3>📤 Publicar Short en YouTube desde ClipForge</h3>
+  <p class="fineprint" id="youtube-publish-status">Conecta tu cuenta de Google para habilitar la subida directa.</p>
+  <label for="yt-privacy">Visibilidad</label>
+  <select id="yt-privacy"><option value="private" selected>Privado · recomendado para probar</option><option value="unlisted">No listado · solo con enlace</option><option value="public">Público · visible para todos</option></select>
+  <label for="yt-kids">¿Este video está dirigido específicamente a niños?</label>
+  <select id="yt-kids"><option value="" selected>Selecciona una respuesta...</option><option value="yes">Sí, está dirigido a niños</option><option value="no">No, no está dirigido a niños</option></select>
+  <label for="yt-synthetic">¿Contiene contenido realista alterado o generado con IA que deba declararse?</label>
+  <select id="yt-synthetic"><option value="" selected>Selecciona una respuesta...</option><option value="yes">Sí, contiene contenido sintético realista</option><option value="no">No</option></select>
+  <label class="verify"><input type="checkbox" id="yt-rights"><span>Confirmo que tengo derechos para publicar este Short, revisé el texto y autorizo subirlo a la cuenta de YouTube que conecté.</span></label>
+  <button type="button" id="yt-publish-now" class="social-action primary2" disabled>▶ Publicar en YouTube desde ClipForge</button>
+  <div id="yt-upload-message" class="upload-result" aria-live="polite"></div>
+</div>
   </div>
  </section>
  </div>
@@ -317,7 +353,7 @@ function socialJobReset(){
 }
 function socialJobReady(id,clips){
   if(socialJob===id&&readyClips.length===clips.length)return;
-  socialJob=id;readyClips=clips||[];
+  socialJob=id;readyClips=clips||[];try{sessionStorage.setItem("clipforge_latest_job",id)}catch(e){}
   $("social-clip").replaceChildren();
   readyClips.forEach((clip,index)=>{
     const o=document.createElement("option");o.value=String(index+1);
@@ -358,7 +394,7 @@ $("make-social-copy").addEventListener("click",async()=>{
  $("social-desc-edit").value=d.description;
  $("social-method").textContent="Método: "+d.method+" · Tema basado en: "+d.topic_basis+". "+d.disclaimer;
  $("social-message").textContent="Listo: revisa el título y el texto antes de publicarlo.";
- $("social-drafts").classList.remove("hidden");
+ $("social-drafts").classList.remove("hidden");updateYoutubePublishPanel();
  }catch(e){$("social-message").textContent="Error: "+e.message;}
  finally{$("make-social-copy").disabled=false;}
 });
@@ -398,5 +434,120 @@ $("share-social").addEventListener("click",async()=>{
   $("social-message").textContent="Se abrió el sistema para compartir el video. Comprueba el resultado en tu red social.";
  }catch(e){$("social-message").textContent="No se pudo compartir: "+e.message+". Descarga el clip y publícalo desde la plataforma.";}
 });
+</script>
+
+<script>
+let ytAuth={configured:false,connected:false,csrf:null};
+let ytPollTimer=null;
+async function refreshYoutubeConnection(){
+  try {
+    const response=await fetch("/api/publish/youtube/status",{cache:"no-store",credentials:"same-origin"});
+    if(!response.ok)throw Error("No disponible");
+    ytAuth=await response.json();
+    $("yt-connect-link").classList.toggle("hidden",!ytAuth.configured||ytAuth.connected);
+    $("yt-disconnect").classList.toggle("hidden",!ytAuth.connected);
+    $("yt-config-info").classList.toggle("hidden",ytAuth.configured);
+    $("yt-connection-message").textContent=ytAuth.connected?
+       "✓ Cuenta autorizada para subir videos mediante YouTube Data API. Las publicaciones requieren tu confirmación.":
+       ytAuth.configured?"Conexión oficial disponible. Pulsa «Conectar YouTube con Google» y autoriza el acceso.":
+       "Pendiente de configurar las credenciales OAuth de ClipForge en Google Cloud y Render.";
+  } catch(e) {
+    $("yt-connection-message").textContent="No se pudo comprobar la conexión de YouTube.";
+  }
+  updateYoutubePublishPanel();
+}
+function updateYoutubePublishPanel(){
+  const isYoutube=$("social-platform").value==="youtube";
+  const hasDraft=!!latestSocial&&isYoutube;
+  $("youtube-publish-panel").classList.toggle("hidden",!isYoutube);
+  $("yt-publish-now").disabled=!(hasDraft&&ytAuth.connected&&ytAuth.configured);
+  $("youtube-publish-status").textContent=ytAuth.connected?
+     "Conectado con Google. Publicarás el Short seleccionado con el título y descripción editados. Revisa las declaraciones obligatorias.":
+     ytAuth.configured?"Pulsa «Conectar YouTube con Google» en el panel izquierdo. Después genera de nuevo el título si hace falta.":
+     "La función está programada, pero no puede publicar hasta que se configuren el cliente y secreto OAuth de Google en Render.";
+}
+$("yt-disconnect").addEventListener("click",async()=>{
+ if(!ytAuth.connected)return;
+ try{
+ const response=await fetch("/api/publish/youtube/disconnect",{
+ method:"POST",credentials:"same-origin",headers:{"X-ClipForge-CSRF":ytAuth.csrf}
+ });
+ if(!response.ok)throw Error("No fue posible desconectar la cuenta.");
+ $("yt-upload-message").textContent="Cuenta desconectada de ClipForge.";
+ await refreshYoutubeConnection();
+ }catch(e){$("yt-upload-message").textContent=e.message;}
+});
+$("social-platform").addEventListener("change",updateYoutubePublishPanel);
+$("make-social-copy").addEventListener("click",()=>setTimeout(updateYoutubePublishPanel,500));
+$("yt-publish-now").addEventListener("click",async()=>{
+ if(!ytAuth.connected||!ytAuth.configured||!latestSocial||$("social-platform").value!=="youtube")return;
+ const title=$("social-title-edit").value.trim(), description=$("social-desc-edit").value.trim();
+ if(!title||title.length>100){$("yt-upload-message").textContent="YouTube exige un título de 1 a 100 caracteres.";return;}
+ if($("yt-kids").value===""||$("yt-synthetic").value===""){
+   $("yt-upload-message").textContent="Indica si el video es para niños y si contiene contenido sintético realista.";return;
+ }
+ if(!$("yt-rights").checked){$("yt-upload-message").textContent="Confirma los derechos de publicación.";return;}
+ if(!confirm("¿Quieres subir este Short a YouTube con visibilidad «"+$("yt-privacy").selectedOptions[0].text+"»?")){
+   return;
+ }
+ $("yt-publish-now").disabled=true;
+ $("yt-upload-message").textContent="Enviando el Short a YouTube...";
+ try{
+ const resp=await fetch("/api/publish/youtube",{method:"POST",credentials:"same-origin",
+  headers:{"Content-Type":"application/json","X-ClipForge-CSRF":ytAuth.csrf},
+  body:JSON.stringify({job_id:socialJob,number:Number($("social-clip").value),
+  title,description,privacy:$("yt-privacy").value,
+  for_kids:$("yt-kids").value==="yes",
+  altered_media:$("yt-synthetic").value==="yes",
+  confirmed:true})});
+ const data=await resp.json();
+ if(!resp.ok)throw Error(data.detail||"Error al iniciar subida.");
+ clearInterval(ytPollTimer);
+ const check=async()=>{
+  try{
+   const req=await fetch("/api/publish/youtube/uploads/"+encodeURIComponent(data.upload_id),{credentials:"same-origin",cache:"no-store"});
+   const status=await req.json();
+   if(!req.ok)throw Error(status.detail||"No se pudo consultar la subida.");
+   $("yt-upload-message").textContent=status.message+" "+(status.progress||0)+" %";
+   if(status.status==="done"){
+     clearInterval(ytPollTimer);ytPollTimer=null;
+     $("yt-upload-message").replaceChildren();
+     const text=document.createElement("span");text.textContent="✓ YouTube confirmó la carga. Revisa su procesamiento y visibilidad: ";
+     const a=document.createElement("a");a.href=status.url;a.textContent="Abrir video en YouTube";a.target="_blank";a.rel="noopener noreferrer";
+     $("yt-upload-message").append(text,a);
+     $("yt-publish-now").disabled=false;
+   }else if(status.status==="error"){
+     clearInterval(ytPollTimer);ytPollTimer=null;
+     $("yt-upload-message").textContent="Error: "+status.message;
+     $("yt-publish-now").disabled=false;
+   }
+  }catch(e){
+   clearInterval(ytPollTimer);ytPollTimer=null;
+   $("yt-upload-message").textContent="No se pudo comprobar la publicación: "+e.message;
+   $("yt-publish-now").disabled=false;
+  }
+ };
+ await check();
+ if(ytPollTimer===null&&$("yt-publish-now").disabled){
+   ytPollTimer=setInterval(check,3500);
+ }
+ }catch(e){$("yt-upload-message").textContent=e.message;$("yt-publish-now").disabled=false;}
+});
+refreshYoutubeConnection();
+try{
+ const params=new URLSearchParams(location.search);
+ if(params.has("youtube")){
+   $("social-hub").scrollIntoView({behavior:"smooth",block:"start"});
+   if(params.get("youtube")==="connected")$("yt-upload-message").textContent="Google autorizó tu cuenta. Ya puedes subir Shorts cuando hayas generado uno.";
+   if(params.get("youtube")==="cancelled")$("yt-upload-message").textContent="Se canceló la conexión con Google.";
+   history.replaceState(null,"",location.pathname+"#social-hub");
+ }
+ const saved=sessionStorage.getItem("clipforge_latest_job");
+ if(saved&&/^[a-f0-9]{32}$/.test(saved)){
+   fetch("/api/jobs/"+saved,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{
+     if(d&&d.status==="done")socialJobReady(saved,d.clips);
+   }).catch(()=>{});
+ }
+}catch(e){}
 </script>
 </body></html>
