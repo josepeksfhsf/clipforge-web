@@ -381,6 +381,12 @@ publish.addEventListener("click",()=>{
  $("social-hub").scrollIntoView({behavior:"smooth",block:"start"});
 });
 info.append(publish);
+if(c.subtitles_added||c.robot_voice_added){
+ const effects=document.createElement("div");effects.className="scoreinfo";
+ effects.textContent=[c.subtitles_added?"📝 Subtítulos incorporados":"",
+ c.robot_voice_added?"🔊 Narración robótica":""].filter(Boolean).join(" · ");
+ info.append(effects);
+}
 const preview=document.createElement("div");preview.className="metadata-preview";preview.textContent="✨ Creando título, descripción y hashtags...";
 info.append(preview);
 generateClipMetadata(id,currentNumber,preview);
@@ -564,9 +570,43 @@ function updateYoutubePublishPanel(){
      "La función está programada, pero no puede publicar hasta que se configuren el cliente y secreto OAuth de Google en Render.";
 }
 
+// Clear yes/no control: opt-in only, default is no publishing.
+function choosePublish(upload){
+  $("yt-auto-upload").checked=Boolean(upload);
+  $("publish-yes").classList.toggle("active",Boolean(upload));
+  $("publish-no").classList.toggle("active",!upload);
+  $("publish-yes").setAttribute("aria-pressed",String(Boolean(upload)));
+  $("publish-no").setAttribute("aria-pressed",String(!upload));
+  updateAutoYoutubeSettings();
+}
+$("publish-no").addEventListener("click",()=>choosePublish(false));
+$("publish-yes").addEventListener("click",()=>choosePublish(true));
+$("enable-robot-voice").addEventListener("change",()=>{
+  $("robot-text-fields").classList.toggle("hidden",!$("enable-robot-voice").checked);
+});
+async function generateClipMetadata(jobId,number,preview){
+  try{
+    const response=await fetch("/api/jobs/"+encodeURIComponent(jobId)+"/copy",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({number,platform:"youtube",
+        style:$("yt-auto-style").value,
+        topic:$("yt-auto-topic").value.trim()||$("title").value.trim()})
+    });
+    const data=await response.json();
+    if(!response.ok)throw Error(data.detail||"No se pudo preparar el texto");
+    preview.textContent="🎯 Título: "+data.title+"\n#️⃣ "+(data.hashtags||[]).join(" ")+
+      "\nDescripción: "+String(data.description||"").slice(0,175);
+  }catch(e){
+    preview.textContent="Pulsa «Crear texto para publicar» si quieres recibir sugerencias.";
+  }
+}
 function updateAutoYoutubeSettings(){
   const enabled=$("yt-auto-upload").checked;
   $("yt-auto-settings").classList.toggle("hidden",!enabled);
+  $("publish-yes").classList.toggle("active",enabled);
+  $("publish-no").classList.toggle("active",!enabled);
+  $("publish-yes").setAttribute("aria-pressed",String(enabled));
+  $("publish-no").setAttribute("aria-pressed",String(!enabled));
   $("yt-auto-login").classList.toggle("hidden",!ytAuth.configured||ytAuth.connected);
   $("yt-auto-connect").textContent=ytAuth.connected?
     "✓ YouTube conectado. Puedes autorizar la subida automática de hasta tres Shorts.":
@@ -580,8 +620,8 @@ function getYoutubeBatchOptions(){
   return {privacy:$("yt-auto-privacy").value,
     for_kids:$("yt-auto-kids").value==="yes",
     altered_media:$("yt-auto-synthetic").value==="yes",
-    style:$("social-style").value,
-    topic:$("social-topic").value.trim().slice(0,95)};
+    style:$("yt-auto-style").value,
+    topic:($("yt-auto-topic").value.trim()||$("title").value.trim()).slice(0,95)};
 }
 function appendYoutubeBatchLinks(videos){
   const area=$("yt-batch-status");
@@ -634,8 +674,7 @@ async function publishYoutubeBatch(jobId,wasAuthorizedAtGeneration=false){
   const options=getYoutubeBatchOptions();
   if(!options){
     $("yt-batch-hint").textContent="Antes de publicar, elige si los clips son para niños o contienen material sintético realista.";
-    $("yt-auto-upload").checked=true;
-    updateAutoYoutubeSettings();
+    choosePublish(true);
     $("auto-youtube").scrollIntoView({behavior:"smooth"});
     return;
   }
@@ -666,8 +705,7 @@ async function publishYoutubeBatch(jobId,wasAuthorizedAtGeneration=false){
   }
 }
 $("yt-batch-now").addEventListener("click",()=>{
-  $("yt-auto-upload").checked=true;
-  updateAutoYoutubeSettings();
+  choosePublish(true);
   publishYoutubeBatch(socialJob,false);
 });
 $("yt-batch-start-existing").addEventListener("click",()=>publishYoutubeBatch(socialJob,false));
