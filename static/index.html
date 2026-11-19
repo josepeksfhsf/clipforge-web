@@ -114,11 +114,17 @@ header{gap:14px;flex-wrap:wrap}
 .download-all{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(110deg,#3d68ad,#5e56bb);color:white;text-decoration:none;padding:13px 17px;border-radius:12px;font-weight:800;margin:15px 0 6px;font-size:14px}
 .download-all:hover{filter:brightness(1.12)}
 .archive-note{font-size:12px;color:#a9bbd5;margin:0 0 16px}
-</style></head><body><div class="container">
+
+:focus-visible{outline:3px solid #a5f6db;outline-offset:3px}
+.skip-link{position:absolute;top:-72px;left:12px;z-index:9999;background:#e9f9ff;color:#0c2230;text-decoration:none;padding:12px 18px;border-radius:10px;font-size:14px;font-weight:800}
+.skip-link:focus{top:10px}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
+@media(max-width:480px){.header-actions{gap:6px}.header-actions a,.header-actions button{font-size:11px;padding:9px}.hero{margin:39px auto 25px}.hero p{font-size:16px}.download-all{width:100%;justify-content:center;text-align:center}}
+</style></head><body><a class="skip-link" href="#clipforge-main">Saltar al contenido</a><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div>
 <div class="header-actions"><a href="/ayuda.html">❔ Ayuda</a><a href="/planes.html">💎 Planes (próximamente)</a><button id="share-clipforge" type="button">↗ Compartir ClipForge</button><div class="pill" id="service-health" role="status" aria-live="polite">● Comprobando</div></div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
-<div class="layout"><main class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 60 minutos por video · 500 MB por archivo · hasta 12 Shorts distintos por trabajo · formato 9:16</p>
+<div class="layout"><main id="clipforge-main" class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 60 minutos por video · 500 MB por archivo · hasta 12 Shorts distintos por trabajo · formato 9:16</p>
 <form id="form"><div class="tabs"><button type="button" class="tab on" id="tab-url">🔗 Pegar enlace</button><button type="button" class="tab" id="tab-file">⬆ Subir video</button></div>
 <div id="url-area"><label for="url">Pega el enlace de un video</label>
 <input type="text" inputmode="url" autocomplete="off" spellcheck="false" id="url" placeholder="Pega aquí el enlace (Shorts, Reels, TikTok...)">
