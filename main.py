@@ -163,7 +163,23 @@ def download_video(url,folder,output_quality="720"):
     if result.stat().st_size>MAX_BYTES:raise ValueError("El video supera el límite de 500 MB.")
     return result
 
-def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,output_quality="720",subtitles=False,robot_voice=False,voice_text=""):
+def portrait_video_filter(width:int,height:int,framing:str="crop"):
+    """Portrait layout using FFmpeg only; no false claims of face tracking."""
+    if framing=="fit":
+        return (f"scale={width}:{height}:force_original_aspect_ratio=decrease,"
+                f"pad={width}:{height}:(ow-iw)/2:(oh-ih)/2:color=0x101827,"
+                "setsar=1,format=yuv420p")
+    if framing=="blur":
+        # Blur at quarter resolution to reduce CPU cost on Render Free.
+        bw,bh=width//4,height//4
+        return (f"split=2[bg][fg];[bg]scale={bw}:{bh}:force_original_aspect_ratio=increase,"
+                f"crop={bw}:{bh},boxblur=12:1,scale={width}:{height}[blur];"
+                f"[fg]scale={width}:{height}:force_original_aspect_ratio=decrease[front];"
+                "[blur][front]overlay=(W-w)/2:(H-h)/2,setsar=1,format=yuv420p")
+    return (f"scale={width}:{height}:force_original_aspect_ratio=increase,"
+            f"crop={width}:{height},setsar=1,format=yuv420p")
+
+def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,output_quality="720",framing="crop",subtitles=False,robot_voice=False,voice_text=""):
     work=Path(jobs[j]["folder"])
     try:
         with slot:
@@ -215,8 +231,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,outp
                     break
                 set_status(j,progress=30+int(i/count*60),message=f"Creando clip {i+1} de {count}...")
                 out=work/f"short_{i+1}.mp4"
-                vf=(f"scale={output_width}:{output_height}:force_original_aspect_ratio=increase,"
-                    f"crop={output_width}:{output_height},setsar=1,format=yuv420p")
+                vf=portrait_video_filter(output_width,output_height,framing)
                 subtitle_text=""
                 captions_count=0
                 if subtitles:
@@ -255,7 +270,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,outp
                 command(cmd,230)
                 result={"name":f"Short {i+1}","ordinal":i+1,"start":start,"length":round(clip_duration,1),"url":f"/api/jobs/{j}/clips/{i+1}","quality":output_quality+"p","width":output_width,"height":output_height,
                         "subtitles_added":bool(captions_count),"subtitle_blocks":captions_count,
-                        "robot_voice_added":bool(audio_path)}
+                        "robot_voice_added":bool(audio_path),"framing":framing}
                 if subtitle_text:
                     result["transcript"]=subtitle_text[:550]
                 if smart_mode and smart_data and not smart_data.get("unavailable") and i<len(picks):
@@ -288,7 +303,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,outp
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True,"output_qualities":["720p","1080p"],"default_quality":"720p","zip_export_available":True,"pricing_preview":True,"billing_enabled":False,"build":os.getenv("RENDER_GIT_COMMIT","")[:10]}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True,"output_qualities":["720p","1080p"],"default_quality":"720p","framing_modes":["crop","fit","blur"],"zip_export_available":True,"pricing_preview":True,"billing_enabled":False,"build":os.getenv("RENDER_GIT_COMMIT","")[:10]}
 
 @app.get("/api/trends")
 def trends(region:str="CL"):
@@ -298,13 +313,15 @@ def trends(region:str="CL"):
 
 @app.post("/api/jobs",status_code=202)
 async def create(url:str=Form(""),file:UploadFile|None=File(None),
-                 length:int=Form(30),count:int=Form(2),title:str=Form(""),output_quality:str=Form("720"),
+                 length:int=Form(30),count:int=Form(2),title:str=Form(""),output_quality:str=Form("720"),framing:str=Form("crop"),
                  start:float=Form(-1),smart:bool=Form(False),region:str=Form("CL"),
                  subtitles:bool=Form(False),robot_voice:bool=Form(False),voice_text:str=Form(""),
                  rights:bool=Form(False)):
     if not rights:raise HTTPException(400,"Confirma que tienes derechos para utilizar el video.")
     if length not in (15,30,45,60) or not 1 <= count <= 12:raise HTTPException(400,"Elige entre 1 y 12 clips de 15, 30, 45 o 60 segundos.")
     if output_quality not in ("720","1080"):raise HTTPException(400,"Calidad inválida. Elige 720p o 1080p.")
+    if framing not in ("crop","fit","blur"):
+        raise HTTPException(400,"El encuadre debe ser Recorte central, Video completo o Fondo desenfocado.")
     if not math.isfinite(start) or start < -1 or start > MAX_DURATION_SECONDS:
         raise HTTPException(400,"El segundo de inicio no es válido.")
     if region not in REGIONS: raise HTTPException(400,"Región no válida.")
@@ -338,9 +355,9 @@ async def create(url:str=Form(""),file:UploadFile|None=File(None),
         with mutex:
             jobs[j]={"status":"queued","progress":0,"message":"En cola...","created":time.time(),
                      "folder":str(folder),"clips":[],"analysis":None,"topic_hint":title[:80],
-                     "copy_cache":{},"output_quality":output_quality}
+                     "copy_cache":{},"output_quality":output_quality,"framing":framing}
             _persist_job(j)
-        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region,output_quality,subtitles,robot_voice,voice_text),daemon=True).start()
+        threading.Thread(target=render,args=(j,normalized,str(uploaded) if uploaded else None,length,count,title,start,smart,region,output_quality,framing,subtitles,robot_voice,voice_text),daemon=True).start()
     except Exception:
         shutil.rmtree(folder,ignore_errors=True)
         raise
