@@ -1,4 +1,4 @@
-import json, math, os, re, shutil, subprocess, tempfile, threading, time, uuid
+import json, math, os, re, shutil, subprocess, tempfile, threading, time, uuid, zipfile
 from pathlib import Path
 from urllib.parse import urlparse, parse_qs
 from fastapi import FastAPI, Form, File, UploadFile, HTTPException, Body
@@ -17,6 +17,8 @@ app=FastAPI(title="ClipForge")
 jobs={}
 mutex=threading.RLock()
 slot=threading.BoundedSemaphore(1)
+archive_lock=threading.Lock()
+ARCHIVE_MAX_BYTES=350*1024*1024
 JOB_TTL_SECONDS=3600
 JOB_SNAPSHOT_FIELDS=("status","progress","message","created","clips","analysis","topic_hint","output_quality")
 def _persist_job(job_id):
@@ -398,6 +400,43 @@ def social_copy(j: str, params: dict = Body(...)):
         if j in jobs and len(jobs[j]["copy_cache"]) < 30:
             jobs[j]["copy_cache"][key] = result
     return result
+
+@app.get("/api/jobs/{j}/bundle")
+def download_all_clips(j:str):
+    """One download for an entire job, without CPU-heavy recompression."""
+    if not re.fullmatch(r"[a-f0-9]{32}",j):
+        raise HTTPException(404,"Identificador inválido.")
+    with mutex:
+        job=jobs.get(j)
+        if not job:
+            raise HTTPException(410,"Los videos temporales ya no están disponibles. Regenera los clips.")
+        if job.get("status")!="done":
+            raise HTTPException(409,"Los Shorts todavía se están generando.")
+        folder=Path(job["folder"])
+        count=len(job.get("clips",[]))
+    if count<1 or count>12:
+        raise HTTPException(404,"Este trabajo no tiene clips disponibles.")
+    paths=[folder/f"short_{n}.mp4" for n in range(1,count+1)]
+    if any(not p.is_file() for p in paths):
+        raise HTTPException(410,"Los archivos expiraron. Vuelve a generar los clips.")
+    total=sum(p.stat().st_size for p in paths)
+    if total>ARCHIVE_MAX_BYTES:
+        raise HTTPException(413,"El ZIP sería demasiado grande para este servidor. Descarga los MP4 uno por uno.")
+    destination=folder/"clipforge_all.zip"
+    with archive_lock:
+        if not destination.is_file() or destination.stat().st_mtime<max(p.stat().st_mtime for p in paths):
+            tmp=folder/"clipforge_all.tmp"
+            try:
+                with zipfile.ZipFile(tmp,"w",compression=zipfile.ZIP_STORED,allowZip64=True) as output:
+                    for n,p in enumerate(paths,1):
+                        output.write(p,arcname=f"ClipForge_Short_{n:02}.mp4")
+                os.replace(tmp,destination)
+            except (OSError,zipfile.BadZipFile):
+                tmp.unlink(missing_ok=True)
+                raise HTTPException(503,"No se pudo preparar el ZIP. Descarga los clips individualmente.")
+    return FileResponse(destination,media_type="application/zip",
+                        filename=f"ClipForge_Shorts_{j[:8]}.zip",
+                        headers={"Cache-Control":"private, no-store"})
 
 @app.get("/api/jobs/{j}/clips/{number}")
 def clip(j:str,number:int):
