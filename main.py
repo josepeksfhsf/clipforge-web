@@ -288,7 +288,7 @@ def render(j,url,uploaded,length,count,title,manual_start,smart_mode,region,outp
             except OSError:pass
 
 @app.get("/api/health")
-def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True,"output_qualities":["720p","1080p"],"default_quality":"720p"}
+def health():return {"status":"ok","service":"ClipForge Web","smart_analysis":True,"max_duration_minutes":60,"max_file_mb":500,"subtitles_available":True,"robot_voice_available":True,"max_clips_per_job":12,"distinct_clips":True,"output_qualities":["720p","1080p"],"default_quality":"720p","zip_export_available":True,"pricing_preview":True,"billing_enabled":False,"build":os.getenv("RENDER_GIT_COMMIT","")[:10]}
 
 @app.get("/api/trends")
 def trends(region:str="CL"):
