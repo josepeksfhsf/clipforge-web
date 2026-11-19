@@ -1,6 +1,15 @@
 <!doctype html>
 <html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>ClipForge Web — Shorts gratis</title><style>
+<title>ClipForge Web — Crea Shorts con IA, subtítulos y voz</title>
+<meta name="description" content="Convierte tus videos en Shorts y Reels verticales, elige 720p o 1080p, genera subtítulos, narración y títulos. Crea varios clips distintos y descárgalos en MP4.">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ClipForge Web">
+<meta property="og:title" content="ClipForge — Shorts a partir de tus videos">
+<meta property="og:description" content="Crea Shorts en 720p o 1080p con subtítulos, voz robótica y títulos sugeridos. Prueba la versión beta.">
+<meta property="og:url" content="https://clipforge-web-dccq.onrender.com/">
+<meta name="twitter:card" content="summary">
+<link rel="canonical" href="https://clipforge-web-dccq.onrender.com/"><style>
 :root{font-family:system-ui,-apple-system,Segoe UI,sans-serif;color:#edf0ff;background:#090d1a}*{box-sizing:border-box}
 body{margin:0;background:radial-gradient(ellipse at top right,#58388655,transparent 50%),#090d1a;min-height:100vh}
 .container{width:min(1080px,94%);margin:auto;padding:30px 0 60px}
@@ -97,8 +106,17 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 .social-oauth-card .conn-link.hidden{display:none!important}
 .social-oauth-card .social-logout{font:inherit;font-size:12px;border:1px solid #975369;background:#372338;color:#f7d8d8;border-radius:9px;padding:9px 12px;cursor:pointer}
 .social-oauth-card .social-logout.hidden{display:none!important}
+
+header{gap:14px;flex-wrap:wrap}
+.header-actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+.header-actions a,.header-actions button{font:inherit;font-size:12px;font-weight:750;border:1px solid #536381;background:#172644;color:#e5eaff;border-radius:9px;padding:10px 12px;cursor:pointer;text-decoration:none}
+.header-actions a:hover,.header-actions button:hover{border-color:#9b80ff}
+.download-all{display:inline-flex;align-items:center;gap:8px;background:linear-gradient(110deg,#3d68ad,#5e56bb);color:white;text-decoration:none;padding:13px 17px;border-radius:12px;font-weight:800;margin:15px 0 6px;font-size:14px}
+.download-all:hover{filter:brightness(1.12)}
+.archive-note{font-size:12px;color:#a9bbd5;margin:0 0 16px}
 </style></head><body><div class="container">
-<header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div><div class="pill">● ONLINE</div></header>
+<header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div>
+<div class="header-actions"><a href="/planes.html">💎 Planes (próximamente)</a><button id="share-clipforge" type="button">↗ Compartir ClipForge</button><div class="pill">● ONLINE</div></div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
 <div class="layout"><main class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 60 minutos por video · 500 MB por archivo · hasta 12 Shorts distintos por trabajo · formato 9:16</p>
 <form id="form"><div class="tabs"><button type="button" class="tab on" id="tab-url">🔗 Pegar enlace</button><button type="button" class="tab" id="tab-file">⬆ Subir video</button></div>
@@ -173,6 +191,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
 <button type="button" id="backup-upload">⬆ Subir el archivo de video</button>
 <a href="https://studio.youtube.com/" target="_blank" rel="noopener noreferrer">Abrir YouTube Studio</a></div>
 <div class="cards" id="cards"></div>
+<div id="archive-actions" class="hidden"><a class="download-all" id="archive-link" href="#" download>⬇ Descargar todos los clips (.ZIP)</a><p class="archive-note">Descarga tus clips antes de que el servidor se reinicie. ZIP disponible hasta 350 MB; si tu trabajo es más grande, descarga los MP4 por separado.</p></div>
 <div class="batch-box hidden" id="yt-batch-box"><button type="button" id="yt-batch-now">🚀 Publicar todos los Shorts en YouTube</button>
 <p id="yt-batch-hint">Los títulos y descripciones se generarán para cada clip. Elige la privacidad y confirma que tienes derechos para publicarlos.</p>
 <div id="yt-batch-status" aria-live="polite"></div></div></div>
@@ -266,7 +285,7 @@ footer{margin-top:35px;color:#8590ac;text-align:center;font-size:12px}@media(max
  </div>
 </section>
 
-<footer>ClipForge Web · Usa únicamente contenido propio o autorizado. La monetización depende de las políticas de YouTube.</footer>
+<footer>ClipForge Web (beta) · Usa únicamente contenido propio o autorizado. La monetización de tus videos depende de cada plataforma. <a href="/planes.html" style="color:#bca6fa">Planes en preparación</a>.</footer>
 </div><script>
 const $=id=>document.getElementById(id);let mode="url",interval,objectVideoURL=null,activeJobId=null;
 let jobPollBusy=false,jobPollFailures=0;
@@ -313,6 +332,7 @@ $("source-video").addEventListener("loadedmetadata",()=>{
  if(Number.isFinite(duration)){
   $("manual-start").max=Math.max(0,Math.min(3599,duration-2.1)).toFixed(1);
   $("source-info").textContent="Duración: "+duration.toFixed(1)+" s. Pausa el video y pulsa «Usar segundo del video».";
+  updateClipCountHint();
  }
 });
 function cleanPastedLink(value){
@@ -384,7 +404,34 @@ $("file").onchange=()=>{
   $("source-info").textContent="Sube un video de hasta 60 minutos (500 MB) para ver su duración y elegir el momento exacto.";
  }
  updateManualControls();
+ updateClipCountHint();
 };
+function updateClipCountHint(){
+ const note=$("clip-quantity-hint");
+ const video=$("source-video");
+ const seconds=mode==="file" && $("file").files.length && Number.isFinite(video.duration)?video.duration:0;
+ if(seconds>=2){
+   const desired=Number($("count").value),clipLen=Number($("length").value);
+   const capacity=Math.max(1,Math.floor(seconds/clipLen));
+   const actual=Math.min(desired,capacity);
+   const estimate=actual<desired?"Se podrán crear aproximadamente "+actual+" clips, no "+desired+".":
+      "Hay duración suficiente para generar "+desired+" clips distintos.";
+   note.textContent="Tu archivo dura "+seconds.toFixed(1)+" s. "+estimate+
+     " Los clips no comparten los mismos segundos. Si se repiten escenas de origen, pueden parecerse visualmente.";
+ }else{
+   note.textContent="La IA reparte los clips sin solapamientos. Si el video es corto, generará menos clips. Para videos largos y 1080p el proceso tardará más.";
+ }
+}
+$("count").addEventListener("change",updateClipCountHint);
+$("length").addEventListener("change",updateClipCountHint);
+$("share-clipforge").addEventListener("click",async()=>{
+ const url="https://clipforge-web-dccq.onrender.com/";
+ try{
+  if(navigator.share)await navigator.share({title:"ClipForge Web",text:"Convierte videos en Shorts con subtítulos y títulos sugeridos.",url});
+  else if(navigator.clipboard){await navigator.clipboard.writeText(url);$("share-clipforge").textContent="✓ Enlace copiado";}
+  else prompt("Copia el enlace de ClipForge",url);
+ }catch(e){if(e.name!=="AbortError")prompt("Copia el enlace de ClipForge",url);}
+});
 function setStatus(m,p){$("results").classList.remove("hidden");$("status").textContent=m;$("bar").style.width=(p||0)+"%"}
 async function poll(id){
  if(jobPollBusy)return;
@@ -493,6 +540,7 @@ let readyClips=[], socialJob="", latestSocial=null;
 function socialJobReset(){
   readyClips=[];socialJob="";latestSocial=null;
   $("yt-batch-box").classList.add("hidden");$("yt-batch-status").replaceChildren();
+  $("archive-actions").classList.add("hidden");
   $("yt-batch-now").disabled=false;
   try{sessionStorage.removeItem("clipforge_youtube_batch")}catch(e){}
   $("social-clip").replaceChildren();
@@ -514,7 +562,7 @@ function socialJobReady(id,clips){
   });
   $("social-clip").disabled=!readyClips.length;
   $("make-social-copy").disabled=!readyClips.length;
-  if(readyClips.length){$("results").classList.remove("hidden");$("yt-batch-box").classList.remove("hidden");}
+  if(readyClips.length){$("results").classList.remove("hidden");$("yt-batch-box").classList.remove("hidden");$("archive-actions").classList.remove("hidden");$("archive-link").href="/api/jobs/"+encodeURIComponent(id)+"/bundle";}
   $("social-message").textContent=readyClips.length?"Clips listos. Selecciona la red social y genera tu texto.":"No hay clips disponibles.";try{updateAutoYoutubeSettings()}catch(e){}
 }
 function socialJobSelectClip(number){
