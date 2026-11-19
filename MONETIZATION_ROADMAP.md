@@ -31,13 +31,13 @@ Pendiente y requisito del lanzamiento:
 
 | Plan | Precio tentativo | Cupo propuesto | Funciones |
 | --- | --- | --- | --- |
-| Gratis | CLP $0 | 3 clips/semana | 720p, videos hasta 5 min, futura marca de agua |
-| Creator | CLP $6.990/mes | 50 clips/mes | 720p/1080p, subtítulos y voz, origen hasta 30 min |
-| Pro | CLP $14.990/mes | 150 clips/mes | 1080p, 12 clips/trabajo, publicación YouTube autorizada |
-| Estudio | CLP $34.990/mes | 400 clips/mes | Bibliotecas, lotes, colaboración (pendientes de construir) |
+| Gratis | CLP $0 | 2 clips/semana | 720p, videos hasta 5 min, futura marca de agua |
+| Creator | CLP $6.990/mes | 40 clips/mes | 720p/1080p, subtítulos y voz, origen hasta 30 min |
+| Pro | CLP $14.990/mes | 120 clips/mes | 1080p, 12 clips/trabajo, publicación YouTube autorizada |
+| Estudio | CLP $34.990/mes | 300 clips/mes | Bibliotecas, lotes, colaboración (pendientes de construir) |
 | Propietario | CLP $0 | Exento de cuota comercial | Acceso al plan máximo mediante cuenta verificada |
 
-Los precios y cuotas son hipótesis. Un plan de cientos de clips puede no ser rentable en Render Free: medir CPU por minuto, costo de almacenamiento, ancho de banda, transcripción, proveedor de pagos, impuestos, soporte y margen antes de publicarlo como oferta real.
+Los cupos se redujeron moderadamente respecto de la primera propuesta (noviembre 2026). Los precios y cuotas son hipótesis. Un plan de cientos de clips puede no ser rentable en Render Free: medir CPU por minuto, costo de almacenamiento, ancho de banda, transcripción, proveedor de pagos, impuestos, soporte y margen antes de publicarlo como oferta real.
 
 ## 4. Facturación segura
 
