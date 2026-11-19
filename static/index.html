@@ -116,7 +116,7 @@ header{gap:14px;flex-wrap:wrap}
 .archive-note{font-size:12px;color:#a9bbd5;margin:0 0 16px}
 </style></head><body><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div>
-<div class="header-actions"><a href="/planes.html">💎 Planes (próximamente)</a><button id="share-clipforge" type="button">↗ Compartir ClipForge</button><div class="pill">● ONLINE</div></div></header>
+<div class="header-actions"><a href="/ayuda.html">❔ Ayuda</a><a href="/planes.html">💎 Planes (próximamente)</a><button id="share-clipforge" type="button">↗ Compartir ClipForge</button><div class="pill" id="service-health" role="status" aria-live="polite">● Comprobando</div></div></header>
 <div class="hero"><h1>Convierte tus videos en <span class="grad">Shorts para publicar.</span></h1><p>Pega un enlace público de YouTube, TikTok, Instagram, Facebook o Vimeo, o sube un video propio. Genera clips verticales en MP4 y deja que un análisis experimental proponga los momentos con mayor potencial, sin instalar programas.</p></div>
 <div class="layout"><main class="panel"><h2>Crear mis clips</h2><p class="muted">Hasta 60 minutos por video · 500 MB por archivo · hasta 12 Shorts distintos por trabajo · formato 9:16</p>
 <form id="form"><div class="tabs"><button type="button" class="tab on" id="tab-url">🔗 Pegar enlace</button><button type="button" class="tab" id="tab-file">⬆ Subir video</button></div>
@@ -185,7 +185,9 @@ header{gap:14px;flex-wrap:wrap}
 </section>
 <label class="check"><input id="rights" type="checkbox" required><span>Confirmo que tengo autorización para utilizar, editar y publicar este material.</span></label>
 <button class="primary" id="submit" type="submit">✦ Generar Shorts gratis</button></form>
-<div id="results" class="results hidden"><h2>Tu resultado</h2><div class="progress"><div class="bar" id="bar"></div></div><div id="status" aria-live="polite"></div>
+<div id="results" class="results hidden"><h2>Tu resultado</h2><div class="progress" id="progress-track" role="progressbar" aria-label="Progreso de generación de Shorts" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"><div class="bar" id="bar"></div></div>
+<div id="status" role="status" aria-live="polite" aria-atomic="true"></div>
+<p id="job-help" class="note">Puedes dejar esta pestaña abierta mientras se genera. Los clips son temporales: descárgalos cuando estén listos.</p>
 <div class="backup hidden" id="backup"><strong>La plataforma no permite descargar este video desde nuestro servidor.</strong>
 <p>Si el video es tuyo, descárgalo desde YouTube Studio (Contenido → menú del video → Descargar), o utiliza el archivo original. Después súbelo aquí y ClipForge generará los Shorts en MP4.</p>
 <button type="button" id="backup-upload">⬆ Subir el archivo de video</button>
@@ -285,10 +287,33 @@ header{gap:14px;flex-wrap:wrap}
  </div>
 </section>
 
-<footer>ClipForge Web (beta) · Usa únicamente contenido propio o autorizado. La monetización de tus videos depende de cada plataforma. <a href="/planes.html" style="color:#bca6fa">Planes en preparación</a>.</footer>
+<footer>ClipForge Web (beta) · Usa únicamente contenido propio o autorizado. Los videos son temporales y las publicaciones necesitan autorización. <a href="/ayuda.html" style="color:#bca6fa">Ayuda</a> · <a href="/privacidad.html" style="color:#bca6fa">Privacidad</a> · <a href="/planes.html" style="color:#bca6fa">Planes en preparación</a>.</footer>
 </div><script>
 const $=id=>document.getElementById(id);let mode="url",interval,objectVideoURL=null,activeJobId=null;
 let jobPollBusy=false,jobPollFailures=0;
+
+async function updateServiceHealth(){
+ const el=$("service-health");
+ try{
+  const response=await fetch("/api/health",{cache:"no-store",signal:AbortSignal.timeout(10000)});
+  if(!response.ok)throw Error("offline");
+  const result=await response.json();
+  if(result.status!=="ok")throw Error("offline");
+  el.textContent="● Servidor operativo";
+  el.style.color="#76e9cc";
+  el.style.background="#143b38";
+  el.title="ClipForge en línea. Los trabajos grandes pueden tardar varios minutos.";
+ }catch(e){
+  el.textContent="● Servidor no disponible";
+  el.style.color="#ffd9a0";
+  el.style.background="#503425";
+  el.title="Revisa tu conexión e intenta actualizar la página.";
+ }
+}
+updateServiceHealth();
+window.addEventListener("online",updateServiceHealth);
+window.addEventListener("offline",updateServiceHealth);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)updateServiceHealth();});
 function stopJobPolling(){
   clearInterval(interval);interval=null;
   try{sessionStorage.removeItem("clipforge_processing_job")}catch(e){}
@@ -432,7 +457,13 @@ $("share-clipforge").addEventListener("click",async()=>{
   else prompt("Copia el enlace de ClipForge",url);
  }catch(e){if(e.name!=="AbortError")prompt("Copia el enlace de ClipForge",url);}
 });
-function setStatus(m,p){$("results").classList.remove("hidden");$("status").textContent=m;$("bar").style.width=(p||0)+"%"}
+function setStatus(m,p){
+ $("results").classList.remove("hidden");
+ $("status").textContent=m;
+ const progress=Math.max(0,Math.min(100,Number(p)||0));
+ $("bar").style.width=progress+"%";
+ $("progress-track").setAttribute("aria-valuenow",String(Math.round(progress)));
+}
 async function poll(id){
  if(jobPollBusy)return;
  jobPollBusy=true;
@@ -902,9 +933,15 @@ try{
    });
  }
  const saved=sessionStorage.getItem("clipforge_latest_job");
- if(saved&&/^[a-f0-9]{32}$/.test(saved)){
-   fetch("/api/jobs/"+saved,{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{
-     if(d&&d.status==="done")socialJobReady(saved,d.clips);
+ if(saved&&/^[a-f0-9]{32}$/.test(saved)&&saved!==processing){
+   fetch("/api/jobs/"+saved,{cache:"no-store"}).then(async r=>{
+     if(r.status===404||r.status===410){
+       try{sessionStorage.removeItem("clipforge_latest_job")}catch(e){}
+       return;
+     }
+     if(!r.ok)return;
+     const data=await r.json();
+     if(data.status==="done")await poll(saved); // Also restores the actual video cards.
    }).catch(()=>{});
  }
 }catch(e){}
