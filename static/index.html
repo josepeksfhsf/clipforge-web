@@ -120,6 +120,8 @@ header{gap:14px;flex-wrap:wrap}
 .skip-link:focus{top:10px}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 @media(max-width:480px){.header-actions{gap:6px}.header-actions a,.header-actions button{font-size:11px;padding:9px}.hero{margin:39px auto 25px}.hero p{font-size:16px}.download-all{width:100%;justify-content:center;text-align:center}}
+#frame-preview{margin:16px 0;padding:14px;border:1px solid #384968;border-radius:13px;background:#10192c}
+#frame-preview canvas{display:block;width:min(100%,180px);height:auto;margin:12px auto 0;border-radius:8px;background:#101827}
 </style></head><body><a class="skip-link" href="#clipforge-main">Saltar al contenido</a><div class="container">
 <header><div class="logo"><span class="mark">✂</span>ClipForge <span style="color:#b79afa">Web</span></div>
 <div class="header-actions"><a href="/ayuda.html">❔ Ayuda</a><a href="/planes.html">💎 Planes (próximamente)</a><button id="share-clipforge" type="button">↗ Compartir ClipForge</button><div class="pill" id="service-health" role="status" aria-live="polite">● Comprobando</div></div></header>
@@ -144,12 +146,14 @@ header{gap:14px;flex-wrap:wrap}
 <option value="fit">Video completo — conserva todo con franjas oscuras</option>
 </select>
 <p class="note" id="framing-help">El recorte central llena la pantalla, pero puede cortar personas, subtítulos o elementos de un gameplay. Elige video completo para conservar toda la imagen; el fondo desenfocado tarda un poco más. Por ahora no sigue rostros automáticamente.</p>
+<figure id="frame-preview" class="hidden"><figcaption><strong>Vista previa del encuadre</strong><br><small>Mueve el reproductor para revisar otro momento.</small></figcaption>
+<canvas id="frame-still" width="216" height="384" aria-label="Fotograma con el encuadre seleccionado"></canvas></figure>
 </div>
 <p class="note" id="clip-quantity-hint">La IA prioriza momentos distintos, evita solapamientos y los reparte por el video. Si el original es corto, puede generar menos clips. Generar muchos con subtítulos tarda más.</p>
 <div class="manual-panel"><label class="check" style="margin:0 0 10px"><input type="checkbox" id="manual-mode"><span><strong>Elegir el segundo exacto de inicio</strong><br><span style="font-weight:400">Desactívalo para seguir usando cortes automáticos.</span></span></label>
 <div id="manual-controls" class="hidden"><div class="inline"><label for="manual-start" style="margin:0">Comenzar en</label><input id="manual-start" type="number" min="0" max="3599" step="0.1" value="0"><span>segundos</span><button id="use-playhead" type="button" class="hidden">Usar segundo del video</button></div>
 <small>Si pides varios clips, empezarán uno detrás de otro desde ese segundo. La duración se ajusta automáticamente al final del video.</small></div>
-<video id="source-video" class="source-video hidden" controls preload="metadata" playsinline></video>
+<video id="source-video" class="source-video hidden" controls preload="auto" playsinline></video>
 <small id="source-info">Puedes subir videos de hasta 60 minutos y 500 MB. En Render gratis, los archivos grandes pueden tardar bastante en procesarse.</small></div>
 <section class="ai-box">
 <h3>🤖 ClipForge IA <span style="color:#80e3c5;font-size:11px">BETA</span></h3>
@@ -420,19 +424,47 @@ $("paste-url").addEventListener("click",async()=>{
   $("linkhint").textContent="Tu navegador no autorizó leer el portapapeles. Usa Ctrl+V dentro del campo.";
  }
 });
-function switchMode(m){mode=m;$("tab-url").classList.toggle("on",m==="url");$("tab-file").classList.toggle("on",m==="file");$("url-area").classList.toggle("hidden",m!=="url");$("file-area").classList.toggle("hidden",m!=="file");updateManualControls()}
+function drawFramePreview(){
+ const video=$("source-video"), canvas=$("frame-still");
+ const ready=mode==="file" && objectVideoURL && video.currentSrc===objectVideoURL && video.readyState>=2 && video.videoWidth;
+ $("frame-preview").classList.toggle("hidden",!ready);
+ if(!ready)return;
+ const ctx=canvas.getContext("2d");
+ if(!ctx){$("frame-preview").classList.add("hidden");return}
+ const w=canvas.width,h=canvas.height;
+ function drawLayer(scale){
+  const width=video.videoWidth*scale,height=video.videoHeight*scale;
+  ctx.drawImage(video,(w-width)/2,(h-height)/2,width,height);
+ }
+ const cover=Math.max(w/video.videoWidth,h/video.videoHeight);
+ const contain=Math.min(w/video.videoWidth,h/video.videoHeight);
+ const framing=$("framing").value;
+ ctx.fillStyle="#101827";ctx.fillRect(0,0,w,h);
+ if(framing==="blur"){
+  ctx.save();ctx.filter="blur(7px)";drawLayer(cover*1.15);ctx.restore();
+ }
+ drawLayer(framing==="crop"?cover:contain);
+}
+for(const event of ["loadeddata","seeked","pause","error","emptied"]){
+ $("source-video").addEventListener(event,drawFramePreview);
+}
+$("framing").addEventListener("change",drawFramePreview);
+function switchMode(m){mode=m;$("tab-url").classList.toggle("on",m==="url");$("tab-file").classList.toggle("on",m==="file");$("url-area").classList.toggle("hidden",m!=="url");$("file-area").classList.toggle("hidden",m!=="file");if(m==="url")$("source-video").pause();$("source-video").classList.toggle("hidden",m!=="file"||!objectVideoURL);drawFramePreview();updateClipCountHint();updateManualControls()}
 $("tab-url").onclick=()=>switchMode("url");$("tab-file").onclick=()=>switchMode("file");
 $("file").onchange=()=>{
  const file=$("file").files[0];
+ const video=$("source-video");
+ video.pause();video.removeAttribute("src");video.load();
+ if(objectVideoURL){URL.revokeObjectURL(objectVideoURL);objectVideoURL=null;}
+ video.classList.add("hidden");drawFramePreview();
  $("filename").textContent=file?.name||"Seleccionar archivo";
  if(file&&file.size>500*1024*1024){
    $("source-info").textContent="El archivo supera 500 MB. Usa una versión comprimida.";
    $("file").value="";
    $("filename").textContent="Archivo demasiado grande · límite de 500 MB";
-   updateManualControls();
+   updateManualControls();updateClipCountHint();
    return;
  }
- if(objectVideoURL){URL.revokeObjectURL(objectVideoURL);objectVideoURL=null;}
  if(file){
   objectVideoURL=URL.createObjectURL(file);
   $("source-video").src=objectVideoURL;
